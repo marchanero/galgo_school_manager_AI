@@ -190,14 +190,15 @@ class MediaServerManager {
    * Inicia grabación continua en segmentos
    */
   startRecording(camera, streamKey) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0]
     const cameraDir = path.join(RECORDINGS_DIR, `camera_${camera.id}`)
     
     if (!fs.existsSync(cameraDir)) {
       fs.mkdirSync(cameraDir, { recursive: true })
     }
 
-    const outputPattern = path.join(cameraDir, `${timestamp}_%03d.mp4`)
+    // Formato: YYYY-MM-DD_HH-MM-SS_XXX.mp4
+    // Ejemplo: 2025-11-03_14-30-45_001.mp4
+    const outputPattern = path.join(cameraDir, '%Y-%m-%d_%H-%M-%S_%%03d.mp4')
 
     console.log(`💾 Iniciando grabación: ${camera.name}`)
     console.log(`📁 Guardando en: ${cameraDir}`)
