@@ -14,13 +14,17 @@ export const useMQTT = () => {
 export const MQTTProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false)
   const [messages, setMessages] = useState([])
-  const [sensorData, setSensorData] = useState({})
+  const [sensorData, setSensorData] = useState(new Map())
   const [cameraStatus, setCameraStatus] = useState({})
   const [lastMessage, setLastMessage] = useState(null)
   const [error, setError] = useState(null)
+  const [messageRate, setMessageRate] = useState(0)
+  const [totalMessages, setTotalMessages] = useState(0)
   
   const clientRef = useRef(null)
   const messageHandlersRef = useRef(new Map())
+  const messageCountRef = useRef(0)
+  const lastRateUpdateRef = useRef(Date.now())
 
   // Configuración MQTT
   const config = {
@@ -180,6 +184,18 @@ export const MQTTProvider = ({ children }) => {
 
       console.log('📨 Mensaje MQTT recibido:', topic)
 
+      // Incrementar contador de mensajes
+      messageCountRef.current += 1
+      setTotalMessages(prev => prev + 1)
+
+      // Calcular tasa de mensajes cada segundo
+      const now = Date.now()
+      if (now - lastRateUpdateRef.current >= 1000) {
+        setMessageRate(messageCountRef.current)
+        messageCountRef.current = 0
+        lastRateUpdateRef.current = now
+      }
+
       // Actualizar último mensaje
       setLastMessage(messageObj)
 
@@ -224,15 +240,16 @@ export const MQTTProvider = ({ children }) => {
 
     if (!sensorType || !sensorId) return
 
-    setSensorData(prev => ({
-      ...prev,
-      [sensorId]: {
+    setSensorData(prev => {
+      const newMap = new Map(prev)
+      newMap.set(sensorId, {
         type: sensorType,
-        data,
+        value: data,
         timestamp: data.timestamp || new Date().toISOString(),
         topic
-      }
-    }))
+      })
+      return newMap
+    })
   }, [])
 
   /**
@@ -309,6 +326,8 @@ export const MQTTProvider = ({ children }) => {
     cameraStatus,
     lastMessage,
     error,
+    messageRate,
+    totalMessages,
     connect,
     disconnect,
     subscribe,

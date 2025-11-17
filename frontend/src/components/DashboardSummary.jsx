@@ -1,23 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
+import { useMQTT } from '../contexts/MQTTContext'
 import api from '../services/api'
-
-// Hook MQTT simplificado (para evitar dependencia circular)
-const useMQTTData = () => {
-  const [sensorData, setSensorData] = useState(new Map())
-  const [messageRate, setMessageRate] = useState(0)
-  const [isConnected, setIsConnected] = useState(false)
-
-  useEffect(() => {
-    // Simulación temporal - en producción se conectaría al MQTT real
-    const mockData = new Map()
-    setSensorData(mockData)
-    setMessageRate(0)
-    setIsConnected(false)
-  }, [])
-
-  return { sensorData, messageRate, isConnected }
-}
 
 const DashboardSummary = () => {
   const [cameras, setCameras] = useState([])
@@ -45,7 +29,13 @@ const DashboardSummary = () => {
     activeRecordingsCount 
   } = useRecording()
   
-  const { sensorData, messageRate, isConnected } = useMQTTData()
+  const { 
+    sensorData, 
+    messageRate, 
+    totalMessages,
+    isConnected: mqttConnected,
+    error: mqttError 
+  } = useMQTT()
 
   // Cargar cámaras
   useEffect(() => {
@@ -75,9 +65,11 @@ const DashboardSummary = () => {
       totalSensors: sensorData.size,
       activeSensors: activeSensorsCount,
       messagesPerSecond: messageRate,
-      mqttStatus: isConnected ? 'connected' : 'disconnected'
+      mqttStatus: mqttConnected ? 'connected' : 'disconnected',
+      mqttError: mqttError,
+      totalMessages: totalMessages
     })
-  }, [cameras, activeRecordingsCount, sensorData, messageRate, isConnected])
+  }, [cameras, activeRecordingsCount, sensorData, messageRate, mqttConnected, mqttError, totalMessages])
 
   // Cargar grabaciones cuando se selecciona una cámara
   useEffect(() => {
@@ -232,6 +224,16 @@ const DashboardSummary = () => {
               <p className="text-2xl font-bold mt-2">
                 {stats.messagesPerSecond.toFixed(1)} msg/s
               </p>
+              {stats.mqttError && (
+                <p className="text-xs text-red-200 mt-1 truncate" title={stats.mqttError}>
+                  Error: {stats.mqttError}
+                </p>
+              )}
+              {stats.totalMessages > 0 && (
+                <p className="text-xs text-purple-100 mt-1">
+                  Total: {stats.totalMessages.toLocaleString()}
+                </p>
+              )}
             </div>
             <div className="bg-purple-400/30 rounded-lg p-3">
               <span className="text-3xl">
@@ -504,14 +506,14 @@ const DashboardSummary = () => {
                   </div>
                   
                   <div className="text-sm text-gray-600 dark:text-gray-300">
-                    {sensor.type === 'DHT22' && (
+                    {sensor.type === 'DHT22' && sensor.value && (
                       <>
-                        <div>🌡️ {sensor.value?.temperature?.toFixed(1)}°C</div>
-                        <div>💧 {sensor.value?.humidity?.toFixed(1)}%</div>
+                        <div>🌡️ {sensor.value.temperature?.toFixed(1)}°C</div>
+                        <div>💧 {sensor.value.humidity?.toFixed(1)}%</div>
                       </>
                     )}
-                    {sensor.type === 'MQ135' && (
-                      <div>💨 CO₂: {sensor.value?.co2?.toFixed(0)} ppm</div>
+                    {sensor.type === 'MQ135' && sensor.value && (
+                      <div>💨 CO₂: {sensor.value.co2?.toFixed(0)} ppm</div>
                     )}
                     {sensor.type === 'EmotiBit' && sensor.value && (
                       <>
