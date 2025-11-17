@@ -1,14 +1,18 @@
 import express from 'express'
 import mediaServerManager from '../services/mediaServer.js'
+import sensorRecorder from '../services/sensorRecorder.js'
+import mqttRecordingService from '../services/mqttRecordingService.js'
 import fs from 'fs'
 import path from 'path'
 
 const router = express.Router()
 
-// POST /api/media/start/:cameraId - Iniciar grabación continua
+// POST /api/media/start/:cameraId - Iniciar grabación continua (video + sensores)
 router.post('/start/:cameraId', async (req, res) => {
   try {
     const { cameraId } = req.params
+    const { recordSensors = true, sensorIds = [] } = req.body
+    
     const camera = await req.prisma.camera.findUnique({
       where: { id: parseInt(cameraId) }
     })
@@ -17,12 +21,28 @@ router.post('/start/:cameraId', async (req, res) => {
       return res.status(404).json({ error: 'Cámara no encontrada' })
     }
 
-    const result = mediaServerManager.startCamera(camera)
+    // Iniciar grabación de video
+    const videoResult = mediaServerManager.startCamera(camera)
+    
+    let sensorResult = null
+    
+    if (recordSensors) {
+      // Iniciar grabación de sensores
+      sensorResult = sensorRecorder.startRecording(camera.id, camera.name)
+      
+      // Habilitar grabación automática desde MQTT
+      mqttRecordingService.startRecordingForCamera(camera.id, {
+        recordAllSensors: sensorIds.length === 0,
+        sensorIds
+      })
+    }
     
     res.json({
       success: true,
-      message: `Grabación continua iniciada: ${camera.name}`,
-      ...result
+      message: `Grabación iniciada: ${camera.name}`,
+      video: videoResult,
+      sensors: sensorResult,
+      mqttRecording: recordSensors
     })
   } catch (error) {
     console.error('Error iniciando cámara:', error)
@@ -55,15 +75,24 @@ router.post('/start-hls/:cameraId', async (req, res) => {
   }
 })
 
-// POST /api/media/stop/:cameraId - Detener grabación
-router.post('/stop/:cameraId', (req, res) => {
+// POST /api/media/stop/:cameraId - Detener grabación (video + sensores)
+router.post('/stop/:cameraId', async (req, res) => {
   try {
     const { cameraId } = req.params
+    
+    // Detener grabación de video
     mediaServerManager.stopCamera(parseInt(cameraId))
+    
+    // Detener grabación MQTT
+    mqttRecordingService.stopRecordingForCamera(parseInt(cameraId))
+    
+    // Detener grabación de sensores
+    const sensorResult = await sensorRecorder.stopRecording(parseInt(cameraId))
     
     res.json({
       success: true,
-      message: 'Grabación detenida'
+      message: 'Grabación detenida (video + sensores)',
+      sensors: sensorResult
     })
   } catch (error) {
     console.error('Error deteniendo cámara:', error)
@@ -201,6 +230,103 @@ const streamCurrentRecording = (req, res) => {
 
 router.get('/live/:cameraId', streamCurrentRecording)
 router.get('/current/:cameraId', streamCurrentRecording)
+
+// === RUTAS PARA GRABACIONES DE SENSORES ===
+
+// GET /api/media/sensors/recordings/:cameraId - Listar grabaciones de sensores
+router.get('/sensors/recordings/:cameraId', (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const recordings = sensorRecorder.getRecordings(parseInt(cameraId))
+    
+    res.json({
+      cameraId: parseInt(cameraId),
+      recordings
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/media/sensors/data/:cameraId/:filename - Obtener datos de una grabación
+router.get('/sensors/data/:cameraId/:filename', (req, res) => {
+  try {
+    const { cameraId, filename } = req.params
+    const data = sensorRecorder.readRecording(parseInt(cameraId), filename)
+    
+    res.json({
+      filename,
+      recordCount: data.length,
+      data
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/media/sensors/download/:cameraId/:filename - Descargar grabación de sensores
+router.get('/sensors/download/:cameraId/:filename', (req, res) => {
+  try {
+    const { cameraId, filename } = req.params
+    const recordings = sensorRecorder.getRecordings(parseInt(cameraId))
+    const recording = recordings.find(r => r.filename === filename)
+
+    if (!recording) {
+      return res.status(404).json({ error: 'Grabación no encontrada' })
+    }
+
+    res.download(recording.path, filename)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// DELETE /api/media/sensors/recording/:cameraId/:filename - Eliminar grabación de sensores
+router.delete('/sensors/recording/:cameraId/:filename', (req, res) => {
+  try {
+    const { cameraId, filename } = req.params
+    const result = sensorRecorder.deleteRecording(parseInt(cameraId), filename)
+    
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/media/sensors/status/:cameraId - Estado de grabación de sensores
+router.get('/sensors/status/:cameraId', (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const status = sensorRecorder.getRecordingStatus(parseInt(cameraId))
+    
+    res.json({
+      isRecording: status !== null,
+      ...status
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// POST /api/media/sensors/record/:cameraId - Registrar datos de sensor (usado por MQTT)
+router.post('/sensors/record/:cameraId', (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const sensorData = req.body
+    
+    const success = sensorRecorder.recordSensorData(parseInt(cameraId), sensorData)
+    
+    if (success) {
+      res.json({ success: true })
+    } else {
+      res.status(400).json({ error: 'No hay grabación activa' })
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// === FIN RUTAS SENSORES ===
 
 // GET /api/media/hls/:cameraId/index.m3u8 - Servir manifest HLS (alternativa al puerto 8889)
 router.get('/hls/:cameraId/index.m3u8', (req, res) => {

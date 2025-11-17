@@ -23,6 +23,8 @@ const DashboardSummary = () => {
   const [cameras, setCameras] = useState([])
   const [selectedCameraId, setSelectedCameraId] = useState(null)
   const [cameraRecordings, setCameraRecordings] = useState([])
+  const [sensorRecordings, setSensorRecordings] = useState([])
+  const [recordingTab, setRecordingTab] = useState('video') // 'video' o 'sensors'
   const [stats, setStats] = useState({
     totalCameras: 0,
     recordingCameras: 0,
@@ -85,8 +87,19 @@ const DashboardSummary = () => {
   }, [selectedCameraId])
 
   const loadRecordings = async (cameraId) => {
+    // Cargar grabaciones de video
     const recordings = await getRecordings(cameraId)
     setCameraRecordings(recordings)
+    
+    // Cargar grabaciones de sensores
+    try {
+      const response = await fetch(`/api/media/sensors/recordings/${cameraId}`)
+      const data = await response.json()
+      setSensorRecordings(data.recordings || [])
+    } catch (error) {
+      console.error('Error cargando grabaciones de sensores:', error)
+      setSensorRecordings([])
+    }
   }
 
   const handleStartRecording = async (camera) => {
@@ -107,6 +120,26 @@ const DashboardSummary = () => {
     if (result.success) {
       await loadRecordings(selectedCameraId)
     }
+  }
+
+  const handleDeleteSensorRecording = async (filename) => {
+    if (!confirm(`¿Eliminar grabación de sensores ${filename}?`)) return
+    
+    try {
+      const response = await fetch(`/api/media/sensors/recording/${selectedCameraId}/${filename}`, {
+        method: 'DELETE'
+      })
+      const result = await response.json()
+      if (result.success) {
+        await loadRecordings(selectedCameraId)
+      }
+    } catch (error) {
+      console.error('Error eliminando grabación de sensores:', error)
+    }
+  }
+
+  const handleDownloadSensorRecording = (filename) => {
+    window.open(`/api/media/sensors/download/${selectedCameraId}/${filename}`, '_blank')
   }
 
   const formatFileSize = (bytes) => {
@@ -212,9 +245,14 @@ const DashboardSummary = () => {
       {/* Controles de Grabación */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            🎬 Control de Grabaciones
-          </h3>
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              🎬 Control de Grabaciones
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Graba video 🎥 + datos de sensores 📊 simultáneamente
+            </p>
+          </div>
         </div>
 
         {cameras.length === 0 ? (
@@ -244,7 +282,9 @@ const DashboardSummary = () => {
                     {recording && (
                       <span className="ml-2 px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-full flex items-center">
                         <span className="animate-pulse mr-1">●</span>
-                        REC
+                        <span className="flex flex-col items-center">
+                          <span>🎥 + 📊</span>
+                        </span>
                       </span>
                     )}
                   </div>
@@ -299,6 +339,7 @@ const DashboardSummary = () => {
               onClick={() => {
                 setSelectedCameraId(null)
                 setCameraRecordings([])
+                setSensorRecordings([])
               }}
               className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             >
@@ -306,49 +347,122 @@ const DashboardSummary = () => {
             </button>
           </div>
 
-          {cameraRecordings.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No hay grabaciones disponibles
-            </div>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {cameraRecordings.map((recording, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {recording.filename}
-                    </p>
-                    <div className="flex space-x-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      <span>📏 {formatFileSize(recording.size)}</span>
-                      {recording.duration && (
-                        <span>⏱️ {formatDuration(recording.duration)}</span>
-                      )}
-                      <span>📅 {new Date(recording.created).toLocaleString()}</span>
+          {/* Tabs */}
+          <div className="flex space-x-2 mb-4 border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setRecordingTab('video')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                recordingTab === 'video'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              🎥 Video ({cameraRecordings.length})
+            </button>
+            <button
+              onClick={() => setRecordingTab('sensors')}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                recordingTab === 'sensors'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              📊 Sensores ({sensorRecordings.length})
+            </button>
+          </div>
+
+          {/* Video Recordings */}
+          {recordingTab === 'video' && (
+            cameraRecordings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                No hay grabaciones de video disponibles
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {cameraRecordings.map((recording, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {recording.filename}
+                      </p>
+                      <div className="flex space-x-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <span>📏 {formatFileSize(recording.size)}</span>
+                        {recording.duration && (
+                          <span>⏱️ {formatDuration(recording.duration)}</span>
+                        )}
+                        <span>📅 {new Date(recording.created).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2 ml-4">
+                      <button
+                        onClick={() => downloadRecording(selectedCameraId, recording.filename)}
+                        className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm transition-colors"
+                        title="Descargar"
+                      >
+                        ⬇️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecording(recording.filename)}
+                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors"
+                        title="Eliminar"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="flex space-x-2 ml-4">
-                    <button
-                      onClick={() => downloadRecording(selectedCameraId, recording.filename)}
-                      className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm transition-colors"
-                      title="Descargar"
-                    >
-                      ⬇️
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRecording(recording.filename)}
-                      className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors"
-                      title="Eliminar"
-                    >
-                      🗑️
-                    </button>
+                ))}
+              </div>
+            )
+          )}
+
+          {/* Sensor Recordings */}
+          {recordingTab === 'sensors' && (
+            sensorRecordings.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                No hay grabaciones de sensores disponibles
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {sensorRecordings.map((recording, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {recording.filename}
+                      </p>
+                      <div className="flex space-x-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <span>📏 {formatFileSize(recording.size)}</span>
+                        <span>📊 {recording.recordCount} registros</span>
+                        <span>📅 {new Date(recording.created).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex space-x-2 ml-4">
+                      <button
+                        onClick={() => handleDownloadSensorRecording(recording.filename)}
+                        className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-sm transition-colors"
+                        title="Descargar JSON"
+                      >
+                        ⬇️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSensorRecording(recording.filename)}
+                        className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors"
+                        title="Eliminar"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       )}
