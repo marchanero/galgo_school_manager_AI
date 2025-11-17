@@ -13,6 +13,15 @@ router.post('/start/:cameraId', async (req, res) => {
     const { cameraId } = req.params
     const { recordSensors = true, sensorIds = [], scenarioId, scenarioName } = req.body
     
+    console.log('🎬 Backend /api/media/start/:cameraId recibió:', {
+      cameraId,
+      body: req.body,
+      scenarioId,
+      scenarioName,
+      hasScenarioId: !!scenarioId,
+      hasScenarioName: !!scenarioName
+    })
+    
     const camera = await req.prisma.camera.findUnique({
       where: { id: parseInt(cameraId) }
     })
@@ -28,7 +37,15 @@ router.post('/start/:cameraId', async (req, res) => {
         where: { id: scenarioId }
       })
       finalScenarioName = scenario?.name || 'sin escenario'
+      console.log('📝 Escenario obtenido de BD:', { scenario, finalScenarioName })
     }
+
+    console.log('🎯 Iniciando grabación con:', {
+      cameraId: camera.id,
+      cameraName: camera.name,
+      scenarioId,
+      finalScenarioName
+    })
 
     // Iniciar grabación de video con contexto de escenario
     const videoResult = mediaServerManager.startCamera(camera, scenarioId, finalScenarioName)

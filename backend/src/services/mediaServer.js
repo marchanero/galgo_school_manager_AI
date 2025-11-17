@@ -158,8 +158,17 @@ class MediaServerManager {
    * Inicia SOLO grabación de una cámara (sin HLS streaming)
    * Grabación continua sin pérdida de calidad usando codec copy
    */
-  startCamera(camera, options = {}) {
+  startCamera(camera, scenarioId = null, scenarioName = null) {
     const streamKey = `camera_${camera.id}`
+    
+    console.log('🎥 mediaServer.startCamera llamado:', {
+      cameraId: camera.id,
+      cameraName: camera.name,
+      scenarioId,
+      scenarioName,
+      hasScenarioId: !!scenarioId,
+      hasScenarioName: !!scenarioName
+    })
     
     // Verificar si ya está grabando
     const recordKey = `${streamKey}_recording`
@@ -168,18 +177,18 @@ class MediaServerManager {
       return { streamKey, message: 'Ya está grabando' }
     }
 
-    const scenarioInfo = options.scenarioName ? ` (Escenario: ${options.scenarioName})` : ''
+    const scenarioInfo = scenarioName ? ` (Escenario: ${scenarioName})` : ''
     console.log(`💾 Iniciando grabación continua: ${camera.name}${scenarioInfo}`)
     
     // Solo iniciar grabación (sin HLS)
-    this.startRecording(camera, streamKey, options)
+    this.startRecording(camera, streamKey, { scenarioId, scenarioName })
 
     return {
       streamKey,
       message: 'Grabación iniciada (sin pérdida de calidad)',
       recording: true,
-      scenarioId: options.scenarioId,
-      scenarioName: options.scenarioName
+      scenarioId: scenarioId,
+      scenarioName: scenarioName
     }
   }
 
@@ -265,10 +274,26 @@ class MediaServerManager {
   startRecording(camera, streamKey, options = {}) {
     const { scenarioId, scenarioName } = options
     
+    console.log('📹 mediaServer.startRecording llamado:', {
+      cameraId: camera.id,
+      cameraName: camera.name,
+      options,
+      scenarioId,
+      scenarioName,
+      hasScenarioId: !!scenarioId,
+      hasScenarioName: !!scenarioName
+    })
+    
     // Nueva estructura: recordings/{scenarioName}/{fecha}/camera_{id}/
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const scenarioFolder = scenarioName ? scenarioName.replace(/[^a-zA-Z0-9]/g, '_') : 'sin_escenario'
     const cameraDir = path.join(RECORDINGS_DIR, scenarioFolder, today, `camera_${camera.id}`)
+    
+    console.log('📂 Estructura de carpetas:', {
+      scenarioFolder,
+      cameraDir,
+      RECORDINGS_DIR
+    })
     
     if (!fs.existsSync(cameraDir)) {
       fs.mkdirSync(cameraDir, { recursive: true })

@@ -48,6 +48,16 @@ const DashboardSummary = () => {
     loading: scenariosLoading 
   } = useScenario()
 
+  // Debug: Verificar valor de activeScenario
+  useEffect(() => {
+    console.log('🎭 DashboardSummary - activeScenario cambió:', {
+      activeScenario,
+      id: activeScenario?.id,
+      name: activeScenario?.name,
+      localStorage: localStorage.getItem('activeScenarioId')
+    })
+  }, [activeScenario])
+
   // Verificar estado de una cámara (simplificado)
   const checkCameraStatus = async (cameraId) => {
     try {
@@ -218,7 +228,7 @@ const DashboardSummary = () => {
         </div>
       </div>
 
-      {/* Selector de Escenario */}
+      {/* Escenario Activo */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
@@ -226,26 +236,33 @@ const DashboardSummary = () => {
               <span className="text-3xl">🎭</span>
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Escenario Activo
               </label>
-              <select
-                value={activeScenario?.id || ''}
-                onChange={(e) => {
-                  const scenarioId = parseInt(e.target.value)
-                  const scenario = scenarios.find(s => s.id === scenarioId)
-                  setActiveScenario(scenario || null)
-                }}
-                className="w-full px-4 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                disabled={scenariosLoading}
-              >
-                <option value="">Sin escenario (mostrar todo)</option>
-                {scenarios.map(scenario => (
-                  <option key={scenario.id} value={scenario.id}>
-                    {scenario.name}
-                  </option>
-                ))}
-              </select>
+              {activeScenario ? (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <h3 className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      {activeScenario.name}
+                    </h3>
+                    {activeScenario.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {activeScenario.description}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setActiveScenario(null)}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Desactivar
+                  </button>
+                </div>
+              ) : (
+                <div className="text-gray-500 dark:text-gray-400 italic">
+                  Sin escenario activo (mostrando todo)
+                </div>
+              )}
             </div>
           </div>
           
@@ -264,13 +281,6 @@ const DashboardSummary = () => {
                 </div>
                 <div className="text-gray-600 dark:text-gray-400">Sensores</div>
               </div>
-              {activeScenario.description && (
-                <div className="max-w-xs">
-                  <p className="text-gray-600 dark:text-gray-400 text-xs">
-                    {activeScenario.description}
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </div>

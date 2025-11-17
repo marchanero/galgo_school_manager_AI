@@ -13,7 +13,7 @@ import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { RecordingProvider, useRecording } from './contexts/RecordingContext'
 import { MQTTProvider } from './contexts/MQTTContext'
-import { ScenarioProvider } from './contexts/ScenarioContext'
+import { ScenarioProvider, useScenario } from './contexts/ScenarioContext'
 
 function AppContent() {
   const [cameras, setCameras] = useState([])
@@ -37,6 +37,7 @@ function AppContent() {
   })
   const { theme, toggleTheme } = useTheme()
   const { isRecording, activeRecordingsCount, startRecording, stopRecording } = useRecording()
+  const { activeScenario } = useScenario()
 
   // Verificar estado del servidor
   useEffect(() => {
@@ -114,11 +115,17 @@ function AppContent() {
       const newCamera = await api.createCamera(formData)
       fetchCameras()
       
-      // Auto-iniciar grabación (el backend ya lo hace, esto es para actualizar el contexto)
-      // Nota: Al agregar una cámara no hay escenario activo seleccionado
+      // Auto-iniciar grabación usando el escenario activo si existe
+      console.log('📹 Nueva cámara agregada, iniciando grabación:', {
+        cameraId: newCamera.id,
+        cameraName: newCamera.name,
+        activeScenario: activeScenario,
+        willUseScenario: activeScenario ? activeScenario.name : 'sin_escenario'
+      })
+      
       await startRecording(newCamera.id, newCamera.name, {
-        scenarioId: null,
-        scenarioName: null
+        scenarioId: activeScenario?.id,
+        scenarioName: activeScenario?.name
       })
       
       setError(null)
@@ -498,13 +505,13 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <RecordingProvider>
+      <ScenarioProvider>
         <MQTTProvider>
-          <ScenarioProvider>
+          <RecordingProvider>
             <AppContent />
-          </ScenarioProvider>
+          </RecordingProvider>
         </MQTTProvider>
-      </RecordingProvider>
+      </ScenarioProvider>
     </ThemeProvider>
   )
 }

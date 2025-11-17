@@ -83,25 +83,42 @@ export function RecordingProvider({ children }) {
    */
   const startRecording = useCallback(async (cameraId, cameraName, options = {}) => {
     try {
+      console.log('📹 RecordingContext.startRecording llamado:', {
+        cameraId,
+        cameraName,
+        options,
+        hasScenarioId: !!options.scenarioId,
+        hasScenarioName: !!options.scenarioName
+      })
+
       setRecordings(prev => new Map(prev).set(cameraId, {
         status: 'starting',
         cameraName,
         startedAt: null
       }))
 
+      const requestBody = {
+        recordSensors: true,
+        scenarioId: options.scenarioId,
+        scenarioName: options.scenarioName
+      }
+
+      console.log('📤 Enviando request a backend:', {
+        url: `/api/media/start/${cameraId}`,
+        body: requestBody
+      })
+
       const response = await fetch(`/api/media/start/${cameraId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          recordSensors: true,
-          scenarioId: options.scenarioId,
-          scenarioName: options.scenarioName
-        })
+        body: JSON.stringify(requestBody)
       })
 
       const data = await response.json()
+
+      console.log('📥 Respuesta del backend:', data)
 
       if (!data.success) {
         throw new Error(data.error || 'Error iniciando grabación')

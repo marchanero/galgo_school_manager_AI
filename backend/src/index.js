@@ -151,6 +151,8 @@ const initMQTT = async () => {
 setTimeout(initMQTT, 1000)
 
 // Auto-iniciar grabación para cámaras existentes
+// ⚠️ DESHABILITADO: El auto-inicio siempre graba sin escenario
+// Las grabaciones deben iniciarse manualmente desde el frontend para incluir el escenario activo
 const autoStartRecordings = async () => {
   try {
     const cameras = await prisma.camera.findMany({
@@ -158,40 +160,40 @@ const autoStartRecordings = async () => {
     })
     
     if (cameras.length > 0) {
-      console.log(`📹 Verificando estado de ${cameras.length} cámara(s)...`)
+      console.log(`📹 Encontradas ${cameras.length} cámara(s) activa(s)`)
+      console.log('ℹ️ Auto-inicio DESHABILITADO - Inicia grabación desde el frontend para aplicar escenario')
       
-      for (const camera of cameras) {
-        try {
-          // Verificar si ya está grabando (evitar duplicados)
-          if (mediaServerManager.isRecording(camera.id)) {
-            console.log(`⏭️ Grabación ya activa: ${camera.name} (omitiendo)`)
-            continue
-          }
-          
-          mediaServerManager.startCamera(camera)
-          console.log(`✅ Grabación iniciada: ${camera.name}`)
-          
-          // Publicar estado a MQTT
-          await mqttService.publish(`camera_rtsp/cameras/${camera.id}/recording/status`, {
-            status: 'recording',
-            camera: camera.name,
-            startedAt: new Date().toISOString(),
-            autoStart: true
-          }).catch(err => console.error('Error publicando a MQTT:', err))
-          
-        } catch (error) {
-          console.error(`❌ Error iniciando ${camera.name}:`, error.message)
-        }
-      }
+      // NO iniciar automáticamente - esperar comando del frontend
+      // for (const camera of cameras) {
+      //   try {
+      //     if (mediaServerManager.isRecording(camera.id)) {
+      //       console.log(`⏭️ Grabación ya activa: ${camera.name} (omitiendo)`)
+      //       continue
+      //     }
+      //     
+      //     mediaServerManager.startCamera(camera)
+      //     console.log(`✅ Grabación iniciada: ${camera.name}`)
+      //     
+      //     await mqttService.publish(`camera_rtsp/cameras/${camera.id}/recording/status`, {
+      //       status: 'recording',
+      //       camera: camera.name,
+      //       startedAt: new Date().toISOString(),
+      //       autoStart: true
+      //     }).catch(err => console.error('Error publicando a MQTT:', err))
+      //     
+      //   } catch (error) {
+      //     console.error(`❌ Error iniciando ${camera.name}:`, error.message)
+      //   }
+      // }
     } else {
-      console.log('ℹ️ No hay cámaras activas para grabar')
+      console.log('ℹ️ No hay cámaras activas configuradas')
     }
   } catch (error) {
-    console.error('❌ Error auto-iniciando grabaciones:', error)
+    console.error('❌ Error verificando cámaras:', error)
   }
 }
 
-// Iniciar grabaciones después de que el servidor esté listo
+// Verificar cámaras disponibles (sin auto-iniciar)
 setTimeout(autoStartRecordings, 2000)
 
 // Middleware
