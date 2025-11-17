@@ -117,6 +117,15 @@ function AppContent() {
     })
   }
 
+  // Alias para compatibilidad con el botón de eliminar en configuración
+  const handleDeleteRequest = (cameraId, cameraName) => {
+    setConfirmDelete({
+      isOpen: true,
+      cameraId,
+      cameraName: cameraName || 'esta cámara'
+    })
+  }
+
   const confirmDeleteCamera = async () => {
     try {
       // Detener grabación primero
@@ -127,6 +136,7 @@ function AppContent() {
       if (selectedCamera?.id === confirmDelete.cameraId) {
         setSelectedCamera(null)
       }
+      setConfirmDelete({ isOpen: false, cameraId: null, cameraName: '' })
       setError(null)
     } catch (err) {
       setError(`Error al eliminar cámara: ${err.message}`)

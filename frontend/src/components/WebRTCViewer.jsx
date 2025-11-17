@@ -18,15 +18,19 @@ function WebRTCViewer({ camera }) {
   // Iniciar streaming WebRTC
   const startStreaming = async () => {
     try {
+      console.log('🎬 Iniciando stream para cámara:', camera)
       setStatus('conectando')
       setError(null)
 
       // Llamar API para iniciar stream
+      console.log('📡 Llamando a /api/webrtc/start/' + camera.id)
       const response = await fetch(`/api/webrtc/start/${camera.id}`, {
         method: 'POST'
       })
 
+      console.log('📥 Respuesta recibida:', response.status)
       const data = await response.json()
+      console.log('📦 Datos:', data)
 
       if (!data.success) {
         throw new Error(data.error || 'Error iniciando stream')
@@ -232,6 +236,7 @@ function WebRTCViewer({ camera }) {
   }
 
   if (!camera) {
+    console.warn('⚠️ WebRTCViewer: No hay cámara seleccionada')
     return (
       <div className="camera-viewer">
         <div className="loading">
@@ -240,6 +245,8 @@ function WebRTCViewer({ camera }) {
       </div>
     )
   }
+
+  console.log('📹 WebRTCViewer renderizado con cámara:', camera.name, camera.id)
 
   return (
     <div className="camera-viewer">

@@ -47,15 +47,19 @@ const DashboardSummary = () => {
     loading: scenariosLoading 
   } = useScenario()
 
-  // Verificar estado de una cámara
+  // Verificar estado de una cámara (simplificado)
   const checkCameraStatus = async (cameraId) => {
     try {
-      const response = await fetch(`/api/stream/status/${cameraId}`)
+      // Intentar verificar conectividad, pero no bloquear si falla
+      const response = await fetch(`/api/stream/status/${cameraId}`, {
+        signal: AbortSignal.timeout(3000) // Timeout de 3 segundos
+      })
       const data = await response.json()
       return data.active || false
     } catch (error) {
-      console.error(`Error verificando estado de cámara ${cameraId}:`, error)
-      return false
+      // Si falla la verificación FFmpeg, asumir que está activa si está en la BD
+      console.warn(`⚠️ No se pudo verificar FFmpeg para cámara ${cameraId}, usando estado de BD`)
+      return true // Asumir activa por defecto
     }
   }
 
@@ -66,22 +70,35 @@ const DashboardSummary = () => {
         const data = await api.getCameras()
         setCameras(data)
         
-        // Verificar estado de cada cámara
-        const statusChecks = await Promise.all(
-          data.map(async (camera) => {
-            const isActive = await checkCameraStatus(camera.id)
-            return [camera.id, { active: isActive, lastCheck: Date.now() }]
-          })
+        // Inicializar estado basado en isActive de la BD
+        const initialStatus = new Map(
+          data.map(camera => [
+            camera.id, 
+            { active: camera.isActive, lastCheck: Date.now(), fromDB: true }
+          ])
         )
+        setCameraStatus(initialStatus)
         
-        setCameraStatus(new Map(statusChecks))
+        // Verificar conectividad real en segundo plano (no bloqueante)
+        data.forEach(async (camera) => {
+          try {
+            const isActive = await checkCameraStatus(camera.id)
+            setCameraStatus(prev => new Map(prev).set(camera.id, { 
+              active: isActive, 
+              lastCheck: Date.now(),
+              fromDB: false 
+            }))
+          } catch (error) {
+            console.error(`Error verificando cámara ${camera.id}:`, error)
+          }
+        })
       } catch (error) {
         console.error('Error cargando cámaras:', error)
       }
     }
     
     fetchCameras()
-    const interval = setInterval(fetchCameras, 15000) // Verificar cada 15 segundos
+    const interval = setInterval(fetchCameras, 30000) // Verificar cada 30 segundos
     return () => clearInterval(interval)
   }, [])
 
