@@ -1,7 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
-import { useMQTT } from '../contexts/MQTTContext'
 import api from '../services/api'
+
+// Hook MQTT simplificado (para evitar dependencia circular)
+const useMQTTData = () => {
+  const [sensorData, setSensorData] = useState(new Map())
+  const [messageRate, setMessageRate] = useState(0)
+  const [isConnected, setIsConnected] = useState(false)
+
+  useEffect(() => {
+    // Simulación temporal - en producción se conectaría al MQTT real
+    const mockData = new Map()
+    setSensorData(mockData)
+    setMessageRate(0)
+    setIsConnected(false)
+  }, [])
+
+  return { sensorData, messageRate, isConnected }
+}
 
 const DashboardSummary = () => {
   const [cameras, setCameras] = useState([])
@@ -27,7 +43,7 @@ const DashboardSummary = () => {
     activeRecordingsCount 
   } = useRecording()
   
-  const { sensorData, messageRate, isConnected } = useMQTT()
+  const { sensorData, messageRate, isConnected } = useMQTTData()
 
   // Cargar cámaras
   useEffect(() => {
