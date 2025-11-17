@@ -2,15 +2,6 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const RecordingContext = createContext()
 
-// Usar "export function" en lugar de "export const" para compatibilidad con HMR
-export function useRecording() {
-  const context = useContext(RecordingContext)
-  if (!context) {
-    throw new Error('useRecording must be used within a RecordingProvider')
-  }
-  return context
-}
-
 export function RecordingProvider({ children }) {
   // Cargar estado de grabación desde localStorage
   const [recordings, setRecordings] = useState(() => {
@@ -264,4 +255,13 @@ export function RecordingProvider({ children }) {
       {children}
     </RecordingContext.Provider>
   )
+}
+
+// Hook debe estar después del Provider para compatibilidad con HMR
+export function useRecording() {
+  const context = useContext(RecordingContext)
+  if (!context) {
+    throw new Error('useRecording must be used within a RecordingProvider')
+  }
+  return context
 }

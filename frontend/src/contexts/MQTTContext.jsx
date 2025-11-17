@@ -3,15 +3,7 @@ import mqtt from 'mqtt'
 
 const MQTTContext = createContext()
 
-export const useMQTT = () => {
-  const context = useContext(MQTTContext)
-  if (!context) {
-    throw new Error('useMQTT debe ser usado dentro de un MQTTProvider')
-  }
-  return context
-}
-
-export const MQTTProvider = ({ children }) => {
+export function MQTTProvider({ children }) {
   const [isConnected, setIsConnected] = useState(false)
   const [messages, setMessages] = useState([])
   const [sensorData, setSensorData] = useState(new Map())
@@ -364,4 +356,12 @@ export const MQTTProvider = ({ children }) => {
       {children}
     </MQTTContext.Provider>
   )
+}
+
+export const useMQTT = () => {
+  const context = useContext(MQTTContext)
+  if (!context) {
+    throw new Error('useMQTT must be used within a MQTTProvider')
+  }
+  return context
 }

@@ -2,15 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react'
 
 const ScenarioContext = createContext()
 
-export const useScenario = () => {
-  const context = useContext(ScenarioContext)
-  if (!context) {
-    throw new Error('useScenario debe usarse dentro de ScenarioProvider')
-  }
-  return context
-}
-
-export const ScenarioProvider = ({ children }) => {
+export function ScenarioProvider({ children }) {
   const [scenarios, setScenarios] = useState([])
   const [activeScenario, setActiveScenario] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -232,6 +224,14 @@ export const ScenarioProvider = ({ children }) => {
       {children}
     </ScenarioContext.Provider>
   )
+}
+
+export const useScenario = () => {
+  const context = useContext(ScenarioContext)
+  if (!context) {
+    throw new Error('useScenario debe usarse dentro de ScenarioProvider')
+  }
+  return context
 }
 
 export default ScenarioContext
