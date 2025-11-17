@@ -1,3 +1,5 @@
+@import 'tailwindcss/components';
+
 @layer components {
   .camera-viewer {
     @apply flex flex-col w-full h-full gap-0;

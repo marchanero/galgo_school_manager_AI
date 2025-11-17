@@ -3,13 +3,15 @@ import './App.css'
 import CameraList from './components/CameraList'
 import HLSViewer from './components/HLSViewer'
 import api from './services/api'
+import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 
-function App() {
+function AppContent() {
   const [cameras, setCameras] = useState([])
   const [selectedCamera, setSelectedCamera] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [serverStatus, setServerStatus] = useState('checking')
+  const { theme, toggleTheme } = useTheme()
 
   // Verificar estado del servidor
   useEffect(() => {
@@ -78,51 +80,79 @@ function App() {
   }
 
   return (
-    <div className="app">
-      <header className="header">
-        <h1>🎥 Visor de Cámaras RTSP</h1>
-        <div className="header-status">
-          <span className={`status-badge ${serverStatus}`}>
-            {serverStatus === 'online' ? '🟢 Conectado' : '🔴 Desconectado'}
-          </span>
+    <div className="app min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+      <header className="bg-gray-50 dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <div>
+              <h1 className="text-2xl font-bold gradient-text">🎥 Camera RTSP</h1>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Visor y grabador de transmisiones</span>
+            </div>
+            <div className="flex items-center space-x-6">
+              <span className={`live-indicator ${serverStatus === 'online' ? 'bg-green-500' : 'bg-red-500'}`}>
+                {serverStatus === 'online' ? '🟢 En línea' : '🔴 Fuera de línea'}
+              </span>
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                title={`Cambiar a modo ${theme === 'light' ? 'oscuro' : 'claro'}`}
+              >
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+            </div>
+          </div>
         </div>
       </header>
       
-      <div className="container">
-        <aside className="sidebar">
-          <div className="sidebar-header">
-            <h2>Cámaras Disponibles</h2>
-            <button onClick={handleAddCamera} className="add-camera-btn" title="Agregar cámara">
+      <div className="container flex flex-1 gap-4 p-4 overflow-hidden max-w-7xl mx-auto">
+        <aside className="card w-80 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Cámaras</h2>
+            <button 
+              onClick={handleAddCamera} 
+              className="btn-primary py-1 px-3 text-sm"
+              title="Agregar cámara"
+            >
               ➕
             </button>
           </div>
           
-          {loading && <p className="status-msg">Cargando...</p>}
-          {error && <p className="error-msg">{error}</p>}
+          {loading && <p className="text-sm text-gray-500">⏳ Cargando...</p>}
+          {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</p>}
           
-          <CameraList 
-            cameras={cameras} 
-            selectedCamera={selectedCamera}
-            onSelectCamera={setSelectedCamera}
-            onDeleteCamera={handleDeleteCamera}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <CameraList 
+              cameras={cameras} 
+              selectedCamera={selectedCamera}
+              onSelectCamera={setSelectedCamera}
+              onDeleteCamera={handleDeleteCamera}
+            />
+          </div>
           
-          <button onClick={fetchCameras} className="refresh-btn">
+          <button onClick={fetchCameras} className="btn-secondary w-full mt-4">
             🔄 Refrescar
           </button>
         </aside>
 
-        <main className="viewer">
+        <main className="card flex-1 flex items-center justify-center">
           {selectedCamera ? (
             <HLSViewer camera={selectedCamera} />
           ) : (
-            <div className="placeholder">
-              <p>Selecciona una cámara para ver el stream</p>
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              <p className="text-xl">Selecciona una cámara</p>
             </div>
           )}
         </main>
       </div>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 
