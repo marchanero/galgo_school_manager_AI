@@ -12,23 +12,32 @@ class SensorRecorder {
    * @param {number} cameraId - ID de la cámara
    * @param {string} cameraName - Nombre de la cámara
    * @param {number|null} scenarioId - ID del escenario (opcional)
+   * @param {string|null} scenarioName - Nombre del escenario (opcional)
    */
-  startRecording(cameraId, cameraName, scenarioId = null) {
+  startRecording(cameraId, cameraName, scenarioId = null, scenarioName = null) {
     if (this.activeRecordings.has(cameraId)) {
       console.log(`⚠️ Ya hay una grabación de sensores activa para cámara ${cameraId}`)
       return this.activeRecordings.get(cameraId)
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const scenarioPrefix = scenarioId ? `scenario_${scenarioId}_` : ''
-    const filename = `${scenarioPrefix}sensors_camera_${cameraId}_${timestamp}.jsonl`
-    const sensorDir = path.join(this.recordingsDir, `camera_${cameraId}`)
+    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    
+    // Nueva estructura: recordings/{scenarioName}/{fecha}/camera_{id}/
+    const scenarioFolder = scenarioName ? scenarioName.replace(/[^a-zA-Z0-9]/g, '_') : 'sin_escenario'
+    const sensorDir = path.join(this.recordingsDir, scenarioFolder, today, `camera_${cameraId}`)
     
     // Crear directorio si no existe
     if (!fs.existsSync(sensorDir)) {
       fs.mkdirSync(sensorDir, { recursive: true })
     }
 
+    // Nuevo formato: {scenarioName}_{cameraName}_sensors_{timestamp}.jsonl
+    // Ejemplo: Aula_A_Camara_Principal_sensors_2025-11-17T14-30-45.jsonl
+    const scenarioPrefix = scenarioName ? `${scenarioName.replace(/[^a-zA-Z0-9]/g, '_')}_` : ''
+    const cameraNameClean = cameraName.replace(/[^a-zA-Z0-9]/g, '_')
+    const filename = `${scenarioPrefix}${cameraNameClean}_sensors_${timestamp}.jsonl`
+    
     const filepath = path.join(sensorDir, filename)
     const stream = fs.createWriteStream(filepath, { flags: 'a' })
 
@@ -36,6 +45,7 @@ class SensorRecorder {
       cameraId,
       cameraName,
       scenarioId,
+      scenarioName,
       filename,
       filepath,
       stream,
@@ -45,14 +55,16 @@ class SensorRecorder {
 
     this.activeRecordings.set(cameraId, recording)
     
-    const scenarioInfo = scenarioId ? ` (Escenario ${scenarioId})` : ''
+    const scenarioInfo = scenarioName ? ` (Escenario: ${scenarioName})` : ''
     console.log(`🎬 Grabación de sensores iniciada: ${cameraName}${scenarioInfo} -> ${filename}`)
     
     return {
       success: true,
       filename,
+      filepath,
       startTime: recording.startTime,
-      scenarioId
+      scenarioId,
+      scenarioName
     }
   }
 
@@ -103,18 +115,20 @@ class SensorRecorder {
         
         this.activeRecordings.delete(cameraId)
         
-        const scenarioInfo = recording.scenarioId ? ` (Escenario ${recording.scenarioId})` : ''
+        const scenarioInfo = recording.scenarioName ? ` (Escenario: ${recording.scenarioName})` : ''
         console.log(`🛑 Grabación de sensores detenida: ${recording.cameraName}${scenarioInfo}`)
         console.log(`   Registros: ${recording.recordCount}, Duración: ${duration}s`)
         
         resolve({
           success: true,
           filename: recording.filename,
+          filepath: recording.filepath,
           recordCount: recording.recordCount,
           duration,
           startTime: recording.startTime,
           endTime,
-          scenarioId: recording.scenarioId
+          scenarioId: recording.scenarioId,
+          scenarioName: recording.scenarioName
         })
       })
     })
@@ -136,50 +150,82 @@ class SensorRecorder {
 
   /**
    * Obtiene grabaciones de sensores de una cámara
-   * Ahora incluye información del escenario si existe en el nombre del archivo
+   * Busca en todas las carpetas de escenarios
    */
-  getRecordings(cameraId) {
-    const sensorDir = path.join(this.recordingsDir, `camera_${cameraId}`)
+  getRecordings(cameraId, scenarioName = null) {
+    const recordings = []
     
-    if (!fs.existsSync(sensorDir)) {
-      return []
+    // Si se especifica escenario, buscar solo en ese
+    if (scenarioName) {
+      const scenarioFolder = scenarioName.replace(/[^a-zA-Z0-9]/g, '_')
+      const scenarioDir = path.join(this.recordingsDir, scenarioFolder)
+      
+      if (fs.existsSync(scenarioDir)) {
+        this._scanRecordingsInDir(scenarioDir, cameraId, recordings, scenarioName)
+      }
+    } else {
+      // Buscar en todos los escenarios
+      if (fs.existsSync(this.recordingsDir)) {
+        const scenarios = fs.readdirSync(this.recordingsDir)
+        
+        for (const scenario of scenarios) {
+          const scenarioPath = path.join(this.recordingsDir, scenario)
+          if (fs.statSync(scenarioPath).isDirectory()) {
+            this._scanRecordingsInDir(scenarioPath, cameraId, recordings, scenario)
+          }
+        }
+      }
     }
 
-    const files = fs.readdirSync(sensorDir)
-      .filter(file => file.endsWith('.jsonl'))
-      .map(file => {
-        const filepath = path.join(sensorDir, file)
-        const stats = fs.statSync(filepath)
-        
-        // Extraer scenarioId del nombre del archivo si existe
-        const scenarioMatch = file.match(/scenario_(\d+)_/)
-        const scenarioId = scenarioMatch ? parseInt(scenarioMatch[1]) : null
-        
-        // Contar líneas del archivo
-        const content = fs.readFileSync(filepath, 'utf-8')
-        const recordCount = content.split('\n').filter(line => line.trim()).length
-        
-        return {
-          filename: file,
-          path: filepath,
-          size: stats.size,
-          recordCount,
-          scenarioId,
-          created: stats.birthtime,
-          modified: stats.mtime
-        }
-      })
-      .sort((a, b) => b.created - a.created)
+    return recordings.sort((a, b) => b.created - a.created)
+  }
 
-    return files
+  /**
+   * Escanea un directorio de escenario buscando grabaciones
+   * @private
+   */
+  _scanRecordingsInDir(scenarioDir, cameraId, recordings, scenarioName) {
+    // Recorrer fechas
+    const dates = fs.readdirSync(scenarioDir)
+    
+    for (const date of dates) {
+      const datePath = path.join(scenarioDir, date)
+      if (!fs.statSync(datePath).isDirectory()) continue
+      
+      const sensorDir = path.join(datePath, `camera_${cameraId}`)
+      
+      if (fs.existsSync(sensorDir)) {
+        const files = fs.readdirSync(sensorDir)
+          .filter(file => file.endsWith('.jsonl'))
+          .map(file => {
+            const filepath = path.join(sensorDir, file)
+            const stats = fs.statSync(filepath)
+            
+            // Contar líneas del archivo
+            const content = fs.readFileSync(filepath, 'utf-8')
+            const recordCount = content.split('\n').filter(line => line.trim()).length
+            
+            return {
+              filename: file,
+              path: filepath,
+              size: stats.size,
+              recordCount,
+              scenarioName: scenarioName.replace(/_/g, ' '),
+              date,
+              created: stats.birthtime,
+              modified: stats.mtime
+            }
+          })
+        
+        recordings.push(...files)
+      }
+    }
   }
 
   /**
    * Lee los datos de una grabación de sensores
    */
-  readRecording(cameraId, filename) {
-    const filepath = path.join(this.recordingsDir, `camera_${cameraId}`, filename)
-    
+  readRecording(filepath) {
     if (!fs.existsSync(filepath)) {
       throw new Error('Grabación no encontrada')
     }
@@ -196,9 +242,7 @@ class SensorRecorder {
   /**
    * Elimina una grabación de sensores
    */
-  deleteRecording(cameraId, filename) {
-    const filepath = path.join(this.recordingsDir, `camera_${cameraId}`, filename)
-    
+  deleteRecording(filepath) {
     if (!fs.existsSync(filepath)) {
       throw new Error('Grabación no encontrada')
     }
@@ -227,6 +271,7 @@ class SensorRecorder {
       cameraId,
       cameraName: recording.cameraName,
       scenarioId: recording.scenarioId,
+      scenarioName: recording.scenarioName,
       filename: recording.filename,
       startTime: recording.startTime,
       duration,

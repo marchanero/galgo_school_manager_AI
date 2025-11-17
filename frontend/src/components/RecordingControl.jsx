@@ -1,5 +1,6 @@
 import React from 'react'
 import { useRecording } from '../contexts/RecordingContext'
+import { useScenario } from '../contexts/ScenarioContext'
 
 export default function RecordingControl({ camera }) {
   const { 
@@ -9,6 +10,8 @@ export default function RecordingControl({ camera }) {
     stopRecording 
   } = useRecording()
 
+  const { activeScenario } = useScenario()
+
   const recordingState = getRecordingStatus(camera.id)
   const recording = isRecording(camera.id)
 
@@ -16,7 +19,11 @@ export default function RecordingControl({ camera }) {
     if (recording) {
       await stopRecording(camera.id)
     } else {
-      await startRecording(camera.id, camera.name)
+      // Pasar información del escenario activo al iniciar grabación
+      await startRecording(camera.id, camera.name, {
+        scenarioId: activeScenario?.id,
+        scenarioName: activeScenario?.name
+      })
     }
   }
 

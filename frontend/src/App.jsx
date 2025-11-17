@@ -115,7 +115,11 @@ function AppContent() {
       fetchCameras()
       
       // Auto-iniciar grabación (el backend ya lo hace, esto es para actualizar el contexto)
-      await startRecording(newCamera.id, newCamera.name)
+      // Nota: Al agregar una cámara no hay escenario activo seleccionado
+      await startRecording(newCamera.id, newCamera.name, {
+        scenarioId: null,
+        scenarioName: null
+      })
       
       setError(null)
     } catch (err) {

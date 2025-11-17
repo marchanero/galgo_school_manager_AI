@@ -276,19 +276,46 @@ const startScenarioRecording = async (req, res) => {
     // Iniciar grabación de cada cámara
     for (const cameraRecord of cameraRecords) {
       try {
-        const result = await mediaServerManager.startRecording(cameraRecord.id, cameraRecord.name)
+        // Iniciar grabación de video con información del escenario
+        const videoResult = mediaServerManager.startCamera(cameraRecord, {
+          scenarioId: scenario.id,
+          scenarioName: scenario.name
+        })
         
         // Iniciar grabación de sensores para esta cámara
-        const sensorResult = sensorRecorder.startRecording(cameraRecord.id, cameraRecord.name, scenario.id)
+        const sensorResult = sensorRecorder.startRecording(
+          cameraRecord.id, 
+          cameraRecord.name, 
+          scenario.id,
+          scenario.name
+        )
+        
+        // Crear registro en la BD
+        const recording = await prisma.recording.create({
+          data: {
+            scenarioId: scenario.id,
+            cameraId: cameraRecord.id,
+            videoPath: null, // Se actualizará al detener
+            sensorPath: sensorResult.filepath,
+            startTime: new Date(),
+            metadata: JSON.stringify({
+              cameraName: cameraRecord.name,
+              scenarioName: scenario.name,
+              videoInfo: videoResult,
+              sensorInfo: sensorResult
+            })
+          }
+        })
         
         results.cameras.push({
           id: cameraRecord.id,
           name: cameraRecord.name,
-          videoRecording: result,
+          recordingId: recording.id,
+          videoRecording: videoResult,
           sensorRecording: sensorResult
         })
         
-        console.log(`✅ Grabación iniciada: ${cameraRecord.name}`)
+        console.log(`✅ Grabación iniciada: ${cameraRecord.name} (Recording ID: ${recording.id})`)
       } catch (error) {
         console.error(`❌ Error iniciando grabación de cámara ${cameraRecord.name}:`, error)
         results.errors.push({
@@ -353,15 +380,52 @@ const stopScenarioRecording = async (req, res) => {
     // Detener grabación de cada cámara
     for (const cameraRecord of cameraRecords) {
       try {
-        const result = await mediaServerManager.stopRecording(cameraRecord.id)
+        const videoResult = mediaServerManager.stopCamera(cameraRecord.id)
         
         // Detener grabación de sensores
-        const sensorResult = sensorRecorder.stopRecording(cameraRecord.id)
+        const sensorResult = await sensorRecorder.stopRecording(cameraRecord.id)
+        
+        // Buscar y actualizar registro en la BD
+        const recordings = await prisma.recording.findMany({
+          where: {
+            scenarioId: scenario.id,
+            cameraId: cameraRecord.id,
+            endTime: null // Solo grabaciones activas
+          },
+          orderBy: {
+            startTime: 'desc'
+          },
+          take: 1
+        })
+        
+        if (recordings.length > 0) {
+          const recording = recordings[0]
+          const endTime = new Date()
+          const duration = Math.floor((endTime - recording.startTime) / 1000)
+          
+          // Actualizar con información final
+          await prisma.recording.update({
+            where: { id: recording.id },
+            data: {
+              endTime,
+              duration,
+              sensorPath: sensorResult.filepath,
+              sensorRecords: sensorResult.recordCount,
+              metadata: JSON.stringify({
+                ...JSON.parse(recording.metadata),
+                videoResult,
+                sensorResult
+              })
+            }
+          })
+          
+          console.log(`✅ Recording ${recording.id} actualizado`)
+        }
         
         results.cameras.push({
           id: cameraRecord.id,
           name: cameraRecord.name,
-          videoRecording: result,
+          videoRecording: videoResult,
           sensorRecording: sensorResult
         })
         

@@ -11,7 +11,7 @@ const router = express.Router()
 router.post('/start/:cameraId', async (req, res) => {
   try {
     const { cameraId } = req.params
-    const { recordSensors = true, sensorIds = [] } = req.body
+    const { recordSensors = true, sensorIds = [], scenarioId, scenarioName } = req.body
     
     const camera = await req.prisma.camera.findUnique({
       where: { id: parseInt(cameraId) }
@@ -21,14 +21,28 @@ router.post('/start/:cameraId', async (req, res) => {
       return res.status(404).json({ error: 'Cámara no encontrada' })
     }
 
-    // Iniciar grabación de video
-    const videoResult = mediaServerManager.startCamera(camera)
+    // Obtener nombre del escenario si se proporciona scenarioId
+    let finalScenarioName = scenarioName
+    if (scenarioId && !finalScenarioName) {
+      const scenario = await req.prisma.scenario.findUnique({
+        where: { id: scenarioId }
+      })
+      finalScenarioName = scenario?.name || 'sin escenario'
+    }
+
+    // Iniciar grabación de video con contexto de escenario
+    const videoResult = mediaServerManager.startCamera(camera, scenarioId, finalScenarioName)
     
     let sensorResult = null
     
     if (recordSensors) {
-      // Iniciar grabación de sensores
-      sensorResult = sensorRecorder.startRecording(camera.id, camera.name)
+      // Iniciar grabación de sensores con contexto de escenario
+      sensorResult = sensorRecorder.startRecording(
+        camera.id, 
+        camera.name,
+        scenarioId,
+        finalScenarioName
+      )
       
       // Habilitar grabación automática desde MQTT
       mqttRecordingService.startRecordingForCamera(camera.id, {
@@ -39,10 +53,12 @@ router.post('/start/:cameraId', async (req, res) => {
     
     res.json({
       success: true,
-      message: `Grabación iniciada: ${camera.name}`,
+      message: `Grabación iniciada: ${camera.name}${finalScenarioName ? ` (${finalScenarioName})` : ''}`,
       video: videoResult,
       sensors: sensorResult,
-      mqttRecording: recordSensors
+      mqttRecording: recordSensors,
+      scenarioId,
+      scenarioName: finalScenarioName
     })
   } catch (error) {
     console.error('Error iniciando cámara:', error)
@@ -267,10 +283,19 @@ router.get('/sensors/recordings/:cameraId', (req, res) => {
 router.get('/sensors/data/:cameraId/:filename', (req, res) => {
   try {
     const { cameraId, filename } = req.params
-    const data = sensorRecorder.readRecording(parseInt(cameraId), filename)
+    const recordings = sensorRecorder.getRecordings(parseInt(cameraId))
+    const recording = recordings.find(r => r.filename === filename)
+    
+    if (!recording) {
+      return res.status(404).json({ error: 'Grabación no encontrada' })
+    }
+    
+    const data = sensorRecorder.readRecording(recording.path)
     
     res.json({
       filename,
+      scenarioName: recording.scenarioName,
+      date: recording.date,
       recordCount: data.length,
       data
     })
@@ -300,7 +325,14 @@ router.get('/sensors/download/:cameraId/:filename', (req, res) => {
 router.delete('/sensors/recording/:cameraId/:filename', (req, res) => {
   try {
     const { cameraId, filename } = req.params
-    const result = sensorRecorder.deleteRecording(parseInt(cameraId), filename)
+    const recordings = sensorRecorder.getRecordings(parseInt(cameraId))
+    const recording = recordings.find(r => r.filename === filename)
+    
+    if (!recording) {
+      return res.status(404).json({ error: 'Grabación no encontrada' })
+    }
+    
+    const result = sensorRecorder.deleteRecording(recording.path)
     
     res.json(result)
   } catch (error) {
@@ -342,6 +374,86 @@ router.post('/sensors/record/:cameraId', (req, res) => {
 })
 
 // === FIN RUTAS SENSORES ===
+
+// === RUTAS PARA GRABACIONES POR ESCENARIO ===
+
+// GET /api/media/recordings/scenario/:scenarioId - Listar todas las grabaciones de un escenario
+router.get('/recordings/scenario/:scenarioId', async (req, res) => {
+  try {
+    const { scenarioId } = req.params
+    
+    const recordings = await req.prisma.recording.findMany({
+      where: {
+        scenarioId: parseInt(scenarioId)
+      },
+      include: {
+        scenario: true
+      },
+      orderBy: {
+        startTime: 'desc'
+      }
+    })
+    
+    res.json({
+      scenarioId: parseInt(scenarioId),
+      recordings
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/media/recordings/camera/:cameraId - Listar grabaciones de una cámara (todas los escenarios)
+router.get('/recordings/camera/:cameraId', async (req, res) => {
+  try {
+    const { cameraId } = req.params
+    
+    const recordings = await req.prisma.recording.findMany({
+      where: {
+        cameraId: parseInt(cameraId)
+      },
+      include: {
+        scenario: true
+      },
+      orderBy: {
+        startTime: 'desc'
+      }
+    })
+    
+    res.json({
+      cameraId: parseInt(cameraId),
+      recordings
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/media/recordings/active - Listar grabaciones activas (sin endTime)
+router.get('/recordings/active', async (req, res) => {
+  try {
+    const recordings = await req.prisma.recording.findMany({
+      where: {
+        endTime: null
+      },
+      include: {
+        scenario: true
+      },
+      orderBy: {
+        startTime: 'desc'
+      }
+    })
+    
+    res.json({
+      count: recordings.length,
+      recordings
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// === FIN RUTAS ESCENARIO ===
 
 // GET /api/media/hls/:cameraId/index.m3u8 - Servir manifest HLS (alternativa al puerto 8889)
 router.get('/hls/:cameraId/index.m3u8', (req, res) => {

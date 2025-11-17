@@ -151,6 +151,36 @@ model Scenario {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Relaciones
+  recordings  Recording[]
 
   @@map("scenarios")
+}
+
+// ==================== GRABACIONES ====================
+
+model Recording {
+  id            Int      @id @default(autoincrement())
+  scenarioId    Int
+  scenario      Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  cameraId      Int
+  
+  // Rutas de archivos
+  videoPath     String?  // Ruta al archivo de video MP4
+  sensorPath    String?  // Ruta al archivo JSONL de sensores
+  
+  // Metadatos
+  startTime     DateTime @default(now())
+  endTime       DateTime?
+  duration      Int?     // Duración en segundos
+  fileSize      BigInt?  // Tamaño del archivo de video en bytes
+  sensorRecords Int      @default(0) // Cantidad de registros de sensores
+  
+  // Información adicional (JSON)
+  metadata      String   @default("{}") // { cameraName, scenarioName, sessionId, etc }
+  
+  @@map("recordings")
+  @@index([scenarioId, startTime])
+  @@index([cameraId, startTime])
 }
