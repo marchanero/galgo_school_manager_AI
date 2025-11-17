@@ -97,10 +97,29 @@ function updateValue(sensor) {
 
 function generateEmotiBitData(sensor) {
   const heartRate = updateValue(sensor)
+  
+  // Acelerómetro con movimiento simulado
+  const accelX = (Math.random() - 0.5) * 0.5
+  const accelY = (Math.random() - 0.5) * 0.5
+  const accelZ = 1.0 + (Math.random() - 0.5) * 0.2 // Gravedad ±0.1g
+  
+  // Temperatura corporal correlacionada con frecuencia cardíaca
+  const bodyTemp = 36.0 + (heartRate - 75) * 0.015
+  
+  // Temperatura del sensor (ambiente)
+  const sensorTemp = 20.0 + Math.random() * 10
+  
   return {
     heart_rate: Math.round(heartRate),
-    temperature: Math.round((36 + (heartRate - 75) * 0.015) * 10) / 10,
-    eda: Math.round(Math.random() * 10 * 100) / 100
+    ppg: Math.round((Math.sin(Date.now() / 40) * 0.3 + 0.7) * 1000) / 1000,
+    eda: Math.round(Math.random() * 10 * 100) / 100,
+    temperature: Math.round(bodyTemp * 10) / 10,
+    sensor_temperature: Math.round(sensorTemp * 10) / 10,
+    accel_x: Math.round(accelX * 1000) / 1000,
+    accel_y: Math.round(accelY * 1000) / 1000,
+    accel_z: Math.round(accelZ * 1000) / 1000,
+    hrv: Math.round(30 + Math.random() * 50),
+    ibi: Math.round(60000 / heartRate)
   }
 }
 

@@ -39,12 +39,24 @@ El EmotiBit ahora genera datos biométricos realistas:
 - Muy estable con pequeñas variaciones (±0.01°C)
 - Ligeramente correlacionada con heart rate
 
-**5. HRV (Heart Rate Variability)**
+**5. Temperatura del Sensor - 7Hz efectivo**
+- Temperatura ambiente del dispositivo: 20.0 - 35.0°C
+- Refleja temperatura del entorno
+- Mayor variabilidad que temperatura corporal
+
+**6. Acelerómetro 3 Ejes - 25Hz**
+- **accel_x, accel_y, accel_z** en unidades de g (gravedad)
+- Rango: -2.0g a +2.0g (±0.1g en reposo)
+- Simula movimiento natural del usuario
+- Componente Z incluye gravedad (~1.0g cuando horizontal)
+- Permite detectar: movimiento, gestos, caídas, orientación
+
+**7. HRV (Heart Rate Variability)**
 - RMSSD calculado en tiempo real
 - Rango: 20-100 ms
 - Refleja variabilidad natural del ritmo cardíaco
 
-**6. IBI (Inter-Beat Interval)**
+**8. IBI (Inter-Beat Interval)**
 - Tiempo entre latidos en milisegundos
 - Calculado como: `60000 / heart_rate ± HRV`
 - Ejemplo: 75 BPM = ~800ms IBI
@@ -58,11 +70,20 @@ El EmotiBit ahora genera datos biométricos realistas:
 const emotibitBuffer = {
   ppg: [],              // Buffer para onda PPG
   eda: 5.0,            // μS base
-  temp: 36.5,          // °C base
+  temp: 36.5,          // °C corporal base
   heartRate: 75,       // BPM base
   hrv: 50,             // ms variabilidad
   lastBeat: Date.now(),
-  beatInterval: 800    // ms entre latidos
+  beatInterval: 800,   // ms entre latidos
+  // Acelerómetro
+  accelX: 0,
+  accelY: 0,
+  accelZ: 1.0,         // Gravedad
+  accelVelX: 0,
+  accelVelY: 0,
+  accelVelZ: 0,
+  // Temperatura ambiente
+  sensorTemp: 25.0     // °C del dispositivo
 }
 
 // Fases de simulación
@@ -92,12 +113,16 @@ sensorState[sensor.id] = {
   "sensorId": "EMO001",
   "timestamp": "2025-11-17T14:30:45.123Z",
   "value": {
-    "ppg": 0.847,           // Señal cruda normalizada
-    "heart_rate": 75,       // BPM actual
-    "eda": 5.23,            // μS conductancia
-    "temperature": 36.8,    // °C corporal
-    "hrv": 52,              // ms RMSSD
-    "ibi": 800              // ms entre latidos
+    "ppg": 0.847,                 // Señal cruda normalizada
+    "heart_rate": 75,             // BPM actual
+    "eda": 5.23,                  // μS conductancia
+    "temperature": 36.8,          // °C corporal
+    "sensor_temperature": 25.3,   // °C del dispositivo
+    "accel_x": 0.023,            // g aceleración X
+    "accel_y": -0.015,           // g aceleración Y
+    "accel_z": 1.012,            // g aceleración Z (gravedad)
+    "hrv": 52,                   // ms RMSSD
+    "ibi": 800                   // ms entre latidos
   },
   "location": "Usuario 1",
   "sequence": 12345
@@ -122,16 +147,20 @@ El dashboard ahora muestra:
      75 bpm
      ▔▔▔▔▔▔
 
-🌡️ 36.8°C    ⚡ 5.23μS
-💚 HRV: 52ms  📈 PPG: 0.847
+🌡️ Body: 36.8°C    Sensor: 25.3°C
+⚡ EDA: 5.23μS      📈 PPG: 0.847
+💚 HRV: 52ms        🏃 Accel: 1.0g
 ```
 
 **Componentes visualizados:**
+
 - Heart Rate: Grande y prominente
-- Temperatura: Con precisión de 0.1°C
+- Temperatura Corporal: Con precisión de 0.1°C
+- Temperatura Sensor: Temperatura ambiente del dispositivo
 - EDA: Conductancia en microsiemens
 - HRV: Variabilidad cardíaca
 - PPG: Valor de señal cruda (opcional, para debugging)
+- Acelerómetro: Magnitud total (√(x²+y²+z²))
 
 ## 🧪 Testing
 

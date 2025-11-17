@@ -78,7 +78,17 @@ const emotibitBuffer = {
   heartRate: 75, // BPM base
   hrv: 50, // Variabilidad (ms)
   lastBeat: Date.now(),
-  beatInterval: 800 // ms entre latidos
+  beatInterval: 800, // ms entre latidos
+  // Acelerómetro 3 ejes (g)
+  accelX: 0,
+  accelY: 0,
+  accelZ: 1.0, // Gravedad en Z cuando está horizontal
+  // Velocidad del acelerómetro
+  accelVelX: 0,
+  accelVelY: 0,
+  accelVelZ: 0,
+  // Temperatura ambiente del sensor
+  sensorTemp: 25.0 // °C temperatura del dispositivo
 }
 
 SENSORS.forEach(sensor => {
@@ -156,6 +166,35 @@ function generateEmotiBitValue(sensor) {
   emotibitBuffer.temp += (Math.random() - 0.5) * 0.01
   emotibitBuffer.temp = Math.max(36.0, Math.min(37.5, emotibitBuffer.temp))
   
+  // Temperatura del sensor: Puede variar más (ambiente)
+  emotibitBuffer.sensorTemp += (Math.random() - 0.5) * 0.05
+  emotibitBuffer.sensorTemp = Math.max(20.0, Math.min(35.0, emotibitBuffer.sensorTemp))
+  
+  // Acelerómetro: Simular movimiento suave + gravedad
+  // Añadir aceleración aleatoria (movimiento del usuario)
+  const movementIntensity = 0.1 // Intensidad del movimiento
+  emotibitBuffer.accelVelX += (Math.random() - 0.5) * movementIntensity
+  emotibitBuffer.accelVelY += (Math.random() - 0.5) * movementIntensity
+  emotibitBuffer.accelVelZ += (Math.random() - 0.5) * movementIntensity
+  
+  // Aplicar fricción/amortiguación
+  emotibitBuffer.accelVelX *= 0.95
+  emotibitBuffer.accelVelY *= 0.95
+  emotibitBuffer.accelVelZ *= 0.95
+  
+  // Actualizar posición del acelerómetro
+  emotibitBuffer.accelX += emotibitBuffer.accelVelX
+  emotibitBuffer.accelY += emotibitBuffer.accelVelY
+  emotibitBuffer.accelZ += emotibitBuffer.accelVelZ
+  
+  // Mantener en rango realista (-2g a +2g) con gravedad en Z
+  emotibitBuffer.accelX = Math.max(-2.0, Math.min(2.0, emotibitBuffer.accelX))
+  emotibitBuffer.accelY = Math.max(-2.0, Math.min(2.0, emotibitBuffer.accelY))
+  emotibitBuffer.accelZ = Math.max(-1.0, Math.min(2.0, emotibitBuffer.accelZ))
+  
+  // Añadir componente de gravedad a Z (tiende a 1g cuando está horizontal)
+  emotibitBuffer.accelZ += (1.0 - emotibitBuffer.accelZ) * 0.01
+  
   // Calcular HRV (Heart Rate Variability) en RMSSD (ms)
   const hrv = Math.round(emotibitBuffer.hrv + (Math.random() - 0.5) * 5)
   
@@ -167,8 +206,16 @@ function generateEmotiBitValue(sensor) {
     // EDA (15Hz típico, pero enviamos con PPG)
     eda: Math.round(emotibitBuffer.eda * 100) / 100, // μS (microsiemens)
     
-    // Temperatura (7Hz típico)
+    // Temperatura corporal (7Hz típico)
     temperature: Math.round(emotibitBuffer.temp * 10) / 10, // °C
+    
+    // Temperatura del sensor (7Hz)
+    sensor_temperature: Math.round(emotibitBuffer.sensorTemp * 10) / 10, // °C
+    
+    // Acelerómetro 3 ejes (25Hz)
+    accel_x: Math.round(emotibitBuffer.accelX * 1000) / 1000, // g
+    accel_y: Math.round(emotibitBuffer.accelY * 1000) / 1000, // g
+    accel_z: Math.round(emotibitBuffer.accelZ * 1000) / 1000, // g
     
     // Métricas derivadas
     hrv: Math.max(20, Math.min(100, hrv)), // RMSSD en ms
@@ -207,7 +254,10 @@ function publishSensorData(sensor) {
       if (sensor.type === 'emotibit') {
         // Log más detallado para EmotiBit
         const v = payload.value
-        console.log(`✓ [${new Date().toLocaleTimeString()}] #${messageCount} → ${sensor.name}: HR:${v.heart_rate}bpm PPG:${v.ppg} EDA:${v.eda}μS T:${v.temperature}°C HRV:${v.hrv}ms`)
+        console.log(`✓ [${new Date().toLocaleTimeString()}] #${messageCount} → ${sensor.name}:`)
+        console.log(`  HR:${v.heart_rate}bpm PPG:${v.ppg} EDA:${v.eda}μS`)
+        console.log(`  T_body:${v.temperature}°C T_sensor:${v.sensor_temperature}°C`)
+        console.log(`  Accel: X:${v.accel_x}g Y:${v.accel_y}g Z:${v.accel_z}g HRV:${v.hrv}ms`)
       } else {
         const valueStr = `${payload.value}${sensor.type === 'temperature' ? '°C' : sensor.type === 'humidity' ? '%' : 'ppm'}`
         console.log(`✓ [${new Date().toLocaleTimeString()}] #${messageCount} → ${sensor.name}: ${valueStr}`)
