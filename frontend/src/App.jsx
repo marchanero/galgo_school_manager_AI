@@ -4,9 +4,12 @@ import CameraList from './components/CameraList'
 import WebRTCViewer from './components/WebRTCViewer'
 import CameraModal from './components/CameraModal'
 import ConfirmModal from './components/ConfirmModal'
+import SensorsDashboard from './components/SensorsDashboard'
+import RulesManager from './components/RulesManager'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { RecordingProvider, useRecording } from './contexts/RecordingContext'
+import { MQTTProvider } from './contexts/MQTTContext'
 
 function AppContent() {
   const [cameras, setCameras] = useState([])
@@ -16,6 +19,7 @@ function AppContent() {
   const [serverStatus, setServerStatus] = useState('checking')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, cameraId: null, cameraName: '' })
+  const [activeTab, setActiveTab] = useState('cameras')
   const { theme, toggleTheme } = useTheme()
   const { isRecording, activeRecordingsCount, startRecording, stopRecording } = useRecording()
 
@@ -122,51 +126,100 @@ function AppContent() {
               </button>
             </div>
           </div>
+
+          {/* Tabs Navigation */}
+          <div className="flex space-x-1 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('cameras')}
+              className={`px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'cameras'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              📹 Cámaras
+            </button>
+            <button
+              onClick={() => setActiveTab('sensors')}
+              className={`px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'sensors'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              📊 Sensores
+            </button>
+            <button
+              onClick={() => setActiveTab('rules')}
+              className={`px-6 py-3 text-sm font-medium transition-colors ${
+                activeTab === 'rules'
+                  ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              ⚙️ Reglas
+            </button>
+          </div>
         </div>
       </header>
       
-      <div className="flex flex-1 gap-4 p-4 overflow-hidden">
-        <aside className="card w-80 flex flex-col flex-shrink-0">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cámaras</h2>
-            <button 
-              onClick={() => setIsModalOpen(true)} 
-              className="btn-primary py-1 px-3 text-sm"
-              title="Agregar cámara"
-            >
-              ➕
+      {/* Tab Content */}
+      {activeTab === 'cameras' && (
+        <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+          <aside className="card w-80 flex flex-col flex-shrink-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cámaras</h2>
+              <button 
+                onClick={() => setIsModalOpen(true)} 
+                className="btn-primary py-1 px-3 text-sm"
+                title="Agregar cámara"
+              >
+                ➕
+              </button>
+            </div>
+            
+            {loading && <p className="text-sm text-gray-500">⏳ Cargando...</p>}
+            {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</p>}
+            
+            <div className="flex-1 overflow-y-auto">
+              <CameraList 
+                cameras={cameras} 
+                selectedCamera={selectedCamera}
+                onSelectCamera={setSelectedCamera}
+                onDeleteCamera={handleDeleteCamera}
+              />
+            </div>
+            
+            <button onClick={fetchCameras} className="btn-secondary w-full mt-4">
+              🔄 Refrescar
             </button>
-          </div>
-          
-          {loading && <p className="text-sm text-gray-500">⏳ Cargando...</p>}
-          {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</p>}
-          
-          <div className="flex-1 overflow-y-auto">
-            <CameraList 
-              cameras={cameras} 
-              selectedCamera={selectedCamera}
-              onSelectCamera={setSelectedCamera}
-              onDeleteCamera={handleDeleteCamera}
-            />
-          </div>
-          
-          <button onClick={fetchCameras} className="btn-secondary w-full mt-4">
-            🔄 Refrescar
-          </button>
-        </aside>
+          </aside>
 
-        <main className="card flex-1 flex flex-col overflow-hidden">
-          {selectedCamera ? (
-            <div className="flex-1 overflow-hidden">
-              <WebRTCViewer camera={selectedCamera} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-              <p className="text-xl">Selecciona una cámara</p>
-            </div>
-          )}
-        </main>
-      </div>
+          <main className="card flex-1 flex flex-col overflow-hidden">
+            {selectedCamera ? (
+              <div className="flex-1 overflow-hidden">
+                <WebRTCViewer camera={selectedCamera} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                <p className="text-xl">Selecciona una cámara</p>
+              </div>
+            )}
+          </main>
+        </div>
+      )}
+
+      {activeTab === 'sensors' && (
+        <div className="max-w-7xl mx-auto p-6">
+          <SensorsDashboard />
+        </div>
+      )}
+
+      {activeTab === 'rules' && (
+        <div className="max-w-7xl mx-auto p-6">
+          <RulesManager />
+        </div>
+      )}
 
       <CameraModal
         isOpen={isModalOpen}
@@ -192,7 +245,9 @@ function App() {
   return (
     <ThemeProvider>
       <RecordingProvider>
-        <AppContent />
+        <MQTTProvider>
+          <AppContent />
+        </MQTTProvider>
       </RecordingProvider>
     </ThemeProvider>
   )

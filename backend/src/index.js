@@ -9,8 +9,10 @@ import cameraRoutes from './routes/cameras.js'
 import streamRoutes from './routes/stream.js'
 import mediaRoutes from './routes/media.js'
 import webrtcRoutes, { webrtcService } from './routes/webrtc.js'
+import mqttRoutes from './routes/mqtt.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
+import mqttService from './services/mqttService.js'
 
 dotenv.config()
 
@@ -87,6 +89,65 @@ mediaServerManager.start().then(() => {
   console.error('❌ Error iniciando Media Server:', error)
 })
 
+// Inicializar MQTT Service
+const initMQTT = async () => {
+  try {
+    console.log('🔌 Iniciando servicio MQTT...')
+    await mqttService.connect()
+    
+    // Escuchar comandos de grabación desde MQTT
+    mqttService.on('command', async ({ topic, data }) => {
+      if (topic.includes('/recording/command')) {
+        const cameraId = parseInt(topic.split('/')[2])
+        
+        try {
+          const camera = await prisma.camera.findUnique({
+            where: { id: cameraId }
+          })
+          
+          if (!camera) {
+            console.error(`❌ Cámara ${cameraId} no encontrada`)
+            return
+          }
+          
+          if (data.command === 'start') {
+            console.log(`📹 Iniciando grabación de cámara ${cameraId} por regla MQTT`)
+            mediaServerManager.startCamera(camera)
+            
+            // Publicar estado
+            await mqttService.publish(`camera_rtsp/cameras/${cameraId}/recording/status`, {
+              status: 'recording',
+              camera: camera.name,
+              startedAt: new Date().toISOString(),
+              rule: data.rule
+            })
+            
+          } else if (data.command === 'stop') {
+            console.log(`⏹️ Deteniendo grabación de cámara ${cameraId} por comando MQTT`)
+            mediaServerManager.stopCamera(cameraId)
+            
+            // Publicar estado
+            await mqttService.publish(`camera_rtsp/cameras/${cameraId}/recording/status`, {
+              status: 'stopped',
+              camera: camera.name,
+              stoppedAt: new Date().toISOString()
+            })
+          }
+        } catch (error) {
+          console.error(`❌ Error ejecutando comando de grabación:`, error)
+        }
+      }
+    })
+    
+    console.log('✅ Servicio MQTT iniciado')
+  } catch (error) {
+    console.error('❌ Error iniciando MQTT:', error)
+  }
+}
+
+// Iniciar MQTT
+setTimeout(initMQTT, 1000)
+
 // Auto-iniciar grabación para cámaras existentes
 const autoStartRecordings = async () => {
   try {
@@ -101,6 +162,15 @@ const autoStartRecordings = async () => {
         try {
           mediaServerManager.startCamera(camera)
           console.log(`✅ Grabación iniciada: ${camera.name}`)
+          
+          // Publicar estado a MQTT
+          await mqttService.publish(`camera_rtsp/cameras/${camera.id}/recording/status`, {
+            status: 'recording',
+            camera: camera.name,
+            startedAt: new Date().toISOString(),
+            autoStart: true
+          }).catch(err => console.error('Error publicando a MQTT:', err))
+          
         } catch (error) {
           console.error(`❌ Error iniciando ${camera.name}:`, error.message)
         }
@@ -148,6 +218,7 @@ app.use('/api/cameras', cameraRoutes)
 app.use('/api/stream', streamRoutes)
 app.use('/api/media', mediaRoutes)
 app.use('/api/webrtc', webrtcRoutes)
+app.use('/api/mqtt', mqttRoutes)
 
 // Ruta de health check
 app.get('/health', (req, res) => {
