@@ -14,13 +14,20 @@ import { MQTTProvider } from './contexts/MQTTContext'
 
 function AppContent() {
   const [cameras, setCameras] = useState([])
-  const [selectedCamera, setSelectedCamera] = useState(null)
+  // Recuperar cámara seleccionada del localStorage
+  const [selectedCamera, setSelectedCamera] = useState(() => {
+    const saved = localStorage.getItem('selectedCamera')
+    return saved ? JSON.parse(saved) : null
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [serverStatus, setServerStatus] = useState('checking')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, cameraId: null, cameraName: '' })
-  const [activeTab, setActiveTab] = useState('dashboard')
+  // Recuperar tab activo del localStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'dashboard'
+  })
   const { theme, toggleTheme } = useTheme()
   const { isRecording, activeRecordingsCount, startRecording, stopRecording } = useRecording()
 
@@ -41,6 +48,20 @@ function AppContent() {
     const interval = setInterval(checkServer, 5000)
     return () => clearInterval(interval)
   }, [])
+
+  // Persistir cámara seleccionada en localStorage
+  useEffect(() => {
+    if (selectedCamera) {
+      localStorage.setItem('selectedCamera', JSON.stringify(selectedCamera))
+    } else {
+      localStorage.removeItem('selectedCamera')
+    }
+  }, [selectedCamera])
+
+  // Persistir tab activo en localStorage
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab)
+  }, [activeTab])
 
   // Obtener listado de cámaras
   useEffect(() => {
@@ -176,14 +197,15 @@ function AppContent() {
       
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === 'dashboard' && (
+        {/* Dashboard - siempre montado pero oculto cuando no está activo */}
+        <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
           <div className="max-w-7xl mx-auto p-6">
             <DashboardSummary />
           </div>
-        )}
+        </div>
 
-        {activeTab === 'cameras' && (
-          <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+        {/* Cámaras - siempre montado pero oculto cuando no está activo */}
+        <div className={activeTab === 'cameras' ? 'flex flex-1 gap-4 p-4 overflow-hidden' : 'hidden'}>
           <aside className="card w-80 flex flex-col flex-shrink-0">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cámaras</h2>
@@ -225,14 +247,15 @@ function AppContent() {
             )}
           </main>
         </div>
-      )}
 
+        {/* Sensores - montado solo cuando se visita */}
         {activeTab === 'sensors' && (
           <div className="max-w-7xl mx-auto p-6">
             <SensorsDashboard />
           </div>
         )}
 
+        {/* Reglas - montado solo cuando se visita */}
         {activeTab === 'rules' && (
           <div className="max-w-7xl mx-auto p-6">
             <RulesManager />
