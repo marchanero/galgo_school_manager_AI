@@ -101,7 +101,7 @@ function AppContent() {
   }
 
   return (
-    <div className="app min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300">
+    <div className="app min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300 flex flex-col">
       <header className="bg-gray-50 dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -175,14 +175,15 @@ function AppContent() {
       </header>
       
       {/* Tab Content */}
-      {activeTab === 'dashboard' && (
-        <div className="max-w-7xl mx-auto p-6">
-          <DashboardSummary />
-        </div>
-      )}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'dashboard' && (
+          <div className="max-w-7xl mx-auto p-6">
+            <DashboardSummary />
+          </div>
+        )}
 
-      {activeTab === 'cameras' && (
-        <div className="flex flex-1 gap-4 p-4 overflow-hidden">
+        {activeTab === 'cameras' && (
+          <div className="flex flex-1 gap-4 p-4 overflow-hidden">
           <aside className="card w-80 flex flex-col flex-shrink-0">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Cámaras</h2>
@@ -226,17 +227,18 @@ function AppContent() {
         </div>
       )}
 
-      {activeTab === 'sensors' && (
-        <div className="max-w-7xl mx-auto p-6">
-          <SensorsDashboard />
-        </div>
-      )}
+        {activeTab === 'sensors' && (
+          <div className="max-w-7xl mx-auto p-6">
+            <SensorsDashboard />
+          </div>
+        )}
 
-      {activeTab === 'rules' && (
-        <div className="max-w-7xl mx-auto p-6">
-          <RulesManager />
-        </div>
-      )}
+        {activeTab === 'rules' && (
+          <div className="max-w-7xl mx-auto p-6">
+            <RulesManager />
+          </div>
+        )}
+      </div>
 
       <CameraModal
         isOpen={isModalOpen}

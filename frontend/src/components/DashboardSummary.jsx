@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
 import { useMQTT } from '../contexts/MQTTContext'
 import api from '../services/api'
+import RecordingControlGlobal from './RecordingControlGlobal'
 
 const DashboardSummary = () => {
   const [cameras, setCameras] = useState([])
@@ -9,8 +10,10 @@ const DashboardSummary = () => {
   const [cameraRecordings, setCameraRecordings] = useState([])
   const [sensorRecordings, setSensorRecordings] = useState([])
   const [recordingTab, setRecordingTab] = useState('video') // 'video' o 'sensors'
+  const [cameraStatus, setCameraStatus] = useState(new Map()) // Map<cameraId, {active, lastCheck}>
   const [stats, setStats] = useState({
     totalCameras: 0,
+    activeCameras: 0,
     recordingCameras: 0,
     totalSensors: 0,
     activeSensors: 0,
@@ -20,8 +23,6 @@ const DashboardSummary = () => {
   
   const { 
     recordings, 
-    startRecording, 
-    stopRecording, 
     isRecording,
     getRecordings,
     downloadRecording,
@@ -37,19 +38,41 @@ const DashboardSummary = () => {
     error: mqttError 
   } = useMQTT()
 
-  // Cargar cámaras
+  // Verificar estado de una cámara
+  const checkCameraStatus = async (cameraId) => {
+    try {
+      const response = await fetch(`/api/stream/status/${cameraId}`)
+      const data = await response.json()
+      return data.active || false
+    } catch (error) {
+      console.error(`Error verificando estado de cámara ${cameraId}:`, error)
+      return false
+    }
+  }
+
+  // Cargar cámaras y verificar su estado
   useEffect(() => {
     const fetchCameras = async () => {
       try {
         const data = await api.getCameras()
         setCameras(data)
+        
+        // Verificar estado de cada cámara
+        const statusChecks = await Promise.all(
+          data.map(async (camera) => {
+            const isActive = await checkCameraStatus(camera.id)
+            return [camera.id, { active: isActive, lastCheck: Date.now() }]
+          })
+        )
+        
+        setCameraStatus(new Map(statusChecks))
       } catch (error) {
         console.error('Error cargando cámaras:', error)
       }
     }
     
     fetchCameras()
-    const interval = setInterval(fetchCameras, 10000)
+    const interval = setInterval(fetchCameras, 15000) // Verificar cada 15 segundos
     return () => clearInterval(interval)
   }, [])
 
@@ -59,8 +82,19 @@ const DashboardSummary = () => {
       sensor => Date.now() - new Date(sensor.timestamp).getTime() < 10000
     ).length
 
+    const activeCamerasCount = Array.from(cameraStatus.values()).filter(
+      status => status.active
+    ).length
+
+    console.log('📊 Stats Update:', {
+      sensorDataSize: sensorData.size,
+      activeSensorsCount,
+      sensorDataEntries: Array.from(sensorData.entries()).map(([id, data]) => ({ id, type: data.type }))
+    })
+
     setStats({
       totalCameras: cameras.length,
+      activeCameras: activeCamerasCount,
       recordingCameras: activeRecordingsCount,
       totalSensors: sensorData.size,
       activeSensors: activeSensorsCount,
@@ -69,7 +103,7 @@ const DashboardSummary = () => {
       mqttError: mqttError,
       totalMessages: totalMessages
     })
-  }, [cameras, activeRecordingsCount, sensorData, messageRate, mqttConnected, mqttError, totalMessages])
+  }, [cameras, cameraStatus, activeRecordingsCount, sensorData, messageRate, mqttConnected, mqttError, totalMessages])
 
   // Cargar grabaciones cuando se selecciona una cámara
   useEffect(() => {
@@ -91,17 +125,6 @@ const DashboardSummary = () => {
     } catch (error) {
       console.error('Error cargando grabaciones de sensores:', error)
       setSensorRecordings([])
-    }
-  }
-
-  const handleStartRecording = async (camera) => {
-    await startRecording(camera.id, camera.name)
-  }
-
-  const handleStopRecording = async (cameraId) => {
-    await stopRecording(cameraId)
-    if (selectedCameraId === cameraId) {
-      await loadRecordings(cameraId)
     }
   }
 
@@ -163,14 +186,20 @@ const DashboardSummary = () => {
         </div>
       </div>
 
+      {/* Control de Grabación Global */}
+      <RecordingControlGlobal />
+
       {/* KPIs Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Cámaras */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-blue-100 text-sm font-medium">Total Cámaras</p>
+              <p className="text-blue-100 text-sm font-medium">Cámaras</p>
               <p className="text-4xl font-bold mt-2">{stats.totalCameras}</p>
+              <p className="text-sm text-blue-100 mt-2">
+                {stats.activeCameras} activa{stats.activeCameras !== 1 ? 's' : ''}
+              </p>
             </div>
             <div className="bg-blue-400/30 rounded-lg p-3">
               <span className="text-3xl">📹</span>
@@ -244,15 +273,15 @@ const DashboardSummary = () => {
         </div>
       </div>
 
-      {/* Controles de Grabación */}
+      {/* Estado de Cámaras */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              🎬 Control de Grabaciones
+              📹 Estado de Cámaras
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Graba video 🎥 + datos de sensores 📊 simultáneamente
+              Visualiza el estado de todas las cámaras del sistema
             </p>
           </div>
         </div>
@@ -266,6 +295,8 @@ const DashboardSummary = () => {
             {cameras.map(camera => {
               const recording = isRecording(camera.id)
               const recordingInfo = recordings.get(camera.id)
+              const camStatus = cameraStatus.get(camera.id)
+              const isActive = camStatus?.active || false
               
               return (
                 <div 
@@ -274,11 +305,25 @@ const DashboardSummary = () => {
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">
-                        {camera.name}
-                      </h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {camera.name}
+                        </h4>
+                        <span className={`w-2 h-2 rounded-full ${
+                          isActive 
+                            ? 'bg-green-500 animate-pulse' 
+                            : 'bg-gray-400'
+                        }`} title={isActive ? 'Cámara activa' : 'Cámara inactiva'}></span>
+                      </div>
                       <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
                         {camera.rtspUrl}
+                      </p>
+                      <p className={`text-xs mt-1 ${
+                        isActive 
+                          ? 'text-green-600 dark:text-green-400' 
+                          : 'text-gray-500 dark:text-gray-500'
+                      }`}>
+                        {isActive ? '✓ Conectada' : '✕ Desconectada'}
                       </p>
                     </div>
                     {recording && (
@@ -292,29 +337,13 @@ const DashboardSummary = () => {
                   </div>
 
                   <div className="flex space-x-2">
-                    {!recording ? (
-                      <button
-                        onClick={() => handleStartRecording(camera)}
-                        className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        ▶ Iniciar
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleStopRecording(camera.id)}
-                        className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        ⏹ Detener
-                      </button>
-                    )}
-                    
                     <button
                       onClick={() => setSelectedCameraId(
                         selectedCameraId === camera.id ? null : camera.id
                       )}
-                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
+                      className="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors"
                     >
-                      📁
+                      📁 Ver Grabaciones
                     </button>
                   </div>
 
@@ -472,62 +501,76 @@ const DashboardSummary = () => {
       {/* Actividad Reciente de Sensores */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-          📈 Actividad de Sensores (últimos 10s)
+          📈 Sensores Conectados
         </h3>
         
-        {stats.activeSensors === 0 ? (
+        {sensorData.size === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            No hay sensores activos
+            <div className="text-4xl mb-2">📡</div>
+            <p>No hay sensores conectados al broker MQTT</p>
+            <p className="text-sm mt-1">Los sensores aparecerán aquí automáticamente cuando publiquen datos.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from(sensorData.entries())
-              .filter(([, sensor]) => 
-                Date.now() - new Date(sensor.timestamp).getTime() < 10000
-              )
-              .slice(0, 9)
-              .map(([sensorId, sensor]) => (
-                <div
-                  key={sensorId}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">
-                        {sensor.type}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {sensorId}
-                      </p>
+              .map(([sensorId, sensor]) => {
+                const isRecent = Date.now() - new Date(sensor.timestamp).getTime() < 10000
+                return (
+                  <div
+                    key={sensorId}
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          {sensor.type}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {sensorId}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-1 ${
+                        isRecent 
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                      } text-xs rounded-full flex items-center`}>
+                        <span className={isRecent ? 'animate-pulse mr-1' : 'mr-1'}>●</span>
+                        {isRecent ? 'Activo' : 'Inactivo'}
+                      </span>
                     </div>
-                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs rounded-full">
-                      ● Activo
-                    </span>
+                    
+                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                      {sensor.type === 'DHT22' && sensor.value && (
+                        <>
+                          <div>🌡️ {sensor.value.temperature?.toFixed(1)}°C</div>
+                          <div>💧 {sensor.value.humidity?.toFixed(1)}%</div>
+                        </>
+                      )}
+                      {sensor.type === 'MQ135' && sensor.value && (
+                        <div>💨 CO₂: {sensor.value.co2?.toFixed(0)} ppm</div>
+                      )}
+                      {sensor.type === 'EmotiBit' && sensor.value && (
+                        <>
+                          <div>❤️ {sensor.value.heart_rate?.toFixed(0)} bpm</div>
+                          <div>🌡️ {sensor.value.temperature?.toFixed(1)}°C</div>
+                        </>
+                      )}
+                      {!sensor.value && (
+                        <div className="text-xs italic text-gray-400">Sin datos disponibles</div>
+                      )}
+                    </div>
+                    
+                    <div className="mt-2 text-xs text-gray-400">
+                      {new Date(sensor.timestamp).toLocaleTimeString()}
+                      {!isRecent && (
+                        <span className="ml-2 text-orange-500">
+                          (hace {Math.floor((Date.now() - new Date(sensor.timestamp).getTime()) / 1000)}s)
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
-                    {sensor.type === 'DHT22' && sensor.value && (
-                      <>
-                        <div>🌡️ {sensor.value.temperature?.toFixed(1)}°C</div>
-                        <div>💧 {sensor.value.humidity?.toFixed(1)}%</div>
-                      </>
-                    )}
-                    {sensor.type === 'MQ135' && sensor.value && (
-                      <div>💨 CO₂: {sensor.value.co2?.toFixed(0)} ppm</div>
-                    )}
-                    {sensor.type === 'EmotiBit' && sensor.value && (
-                      <>
-                        <div>❤️ {sensor.value.heart_rate?.toFixed(0)} bpm</div>
-                        <div>🌡️ {sensor.value.temperature?.toFixed(1)}°C</div>
-                      </>
-                    )}
-                  </div>
-                  
-                  <div className="mt-2 text-xs text-gray-400">
-                    {new Date(sensor.timestamp).toLocaleTimeString()}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
           </div>
         )}
       </div>

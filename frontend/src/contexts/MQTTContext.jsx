@@ -56,14 +56,26 @@ export const MQTTProvider = ({ children }) => {
       })
 
       client.on('connect', () => {
-        console.log('✅ Conectado a MQTT broker')
+        console.log('✅ Conectado a MQTT broker [v2 - Fixed]')
         setIsConnected(true)
         setError(null)
 
-        // Auto-suscribirse a tópicos
-        subscribe('camera_rtsp/sensors/#')
-        subscribe('camera_rtsp/cameras/+/recording/status')
-        subscribe('camera_rtsp/rules/#')
+        // Auto-suscribirse a tópicos (usando el cliente directamente, no la función subscribe)
+        const topics = [
+          'camera_rtsp/sensors/#',
+          'camera_rtsp/cameras/+/recording/status',
+          'camera_rtsp/rules/#'
+        ]
+
+        topics.forEach(topic => {
+          client.subscribe(topic, { qos: 1 }, (error) => {
+            if (error) {
+              console.error(`❌ Error suscribiendo a ${topic}:`, error)
+            } else {
+              console.log(`✅ Suscrito a: ${topic}`)
+            }
+          })
+        })
       })
 
       client.on('message', (topic, message) => {
@@ -182,7 +194,7 @@ export const MQTTProvider = ({ children }) => {
         _id: `${topic}_${Date.now()}_${Math.random()}`
       }
 
-      console.log('📨 Mensaje MQTT recibido:', topic)
+      console.log('📨 Mensaje MQTT recibido:', topic, data)
 
       // Incrementar contador de mensajes
       messageCountRef.current += 1
@@ -207,6 +219,7 @@ export const MQTTProvider = ({ children }) => {
 
       // Procesar según tipo de tópico
       if (topic.startsWith('camera_rtsp/sensors/')) {
+        console.log('🔍 Procesando mensaje de sensor:', topic)
         processSensorMessage(topic, data)
       } else if (topic.includes('/recording/status')) {
         processCameraStatus(topic, data)
@@ -234,11 +247,17 @@ export const MQTTProvider = ({ children }) => {
    * Procesar mensajes de sensores
    */
   const processSensorMessage = useCallback((topic, data) => {
+    console.log('🔧 processSensorMessage called:', topic, data)
     const parts = topic.split('/')
     const sensorType = parts[2]
     const sensorId = parts[3]
 
-    if (!sensorType || !sensorId) return
+    console.log('🔍 Parsed sensor:', { sensorType, sensorId, parts })
+
+    if (!sensorType || !sensorId) {
+      console.warn('⚠️ Sensor inválido - faltan type o id:', { sensorType, sensorId })
+      return
+    }
 
     setSensorData(prev => {
       const newMap = new Map(prev)
@@ -248,6 +267,7 @@ export const MQTTProvider = ({ children }) => {
         timestamp: data.timestamp || new Date().toISOString(),
         topic
       })
+      console.log('✅ Sensor agregado al Map:', sensorId, newMap.size, 'sensores totales')
       return newMap
     })
   }, [])
