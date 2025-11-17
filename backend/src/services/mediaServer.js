@@ -237,13 +237,16 @@ class MediaServerManager {
       '-f', 'segment',
       '-segment_time', '3600', // 1 hora por archivo
       '-segment_format', 'mp4',
+      '-segment_format_options', 'movflags=+faststart', // Optimizar para streaming
       '-reset_timestamps', '1',
       '-strftime', '1',
+      '-avoid_negative_ts', 'make_zero', // Evitar timestamps negativos
+      '-max_muxing_queue_size', '9999', // Prevenir pérdida de paquetes
       outputPattern
     ]
 
     const recordProcess = spawn('ffmpeg', recordArgs, {
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'] // Habilitar stdin para poder enviar 'q'
     })
 
     recordProcess.stderr.on('data', (data) => {
@@ -275,9 +278,33 @@ class MediaServerManager {
     const recordKey = `${streamKey}_recording`
     const recordProcess = this.recordingProcesses.get(recordKey)
     if (recordProcess) {
-      recordProcess.kill('SIGTERM')
-      this.recordingProcesses.delete(recordKey)
-      console.log(`🛑 Grabación detenida: camera_${cameraId}`)
+      console.log(`🛑 Deteniendo grabación: camera_${cameraId}`)
+      
+      // Enviar 'q' a FFmpeg para cerrar limpiamente el archivo
+      try {
+        recordProcess.stdin.write('q')
+        recordProcess.stdin.end()
+      } catch (error) {
+        console.log(`⚠️ No se pudo enviar 'q' a FFmpeg, usando SIGTERM`)
+      }
+      
+      // Timeout de seguridad: si no se cierra en 3 segundos, forzar
+      const timeout = setTimeout(() => {
+        if (this.recordingProcesses.has(recordKey)) {
+          console.log(`⚠️ Forzando cierre de grabación: camera_${cameraId}`)
+          recordProcess.kill('SIGKILL')
+          this.recordingProcesses.delete(recordKey)
+        }
+      }, 3000)
+      
+      // Limpiar timeout cuando el proceso termine
+      recordProcess.on('close', () => {
+        clearTimeout(timeout)
+        this.recordingProcesses.delete(recordKey)
+        console.log(`✅ Grabación guardada correctamente: camera_${cameraId}`)
+      })
+    } else {
+      console.log(`⚠️ No hay grabación activa para camera_${cameraId}`)
     }
   }
 
@@ -347,6 +374,55 @@ class MediaServerManager {
    */
   isStreaming(cameraId) {
     return this.rtspProcesses.has(`camera_${cameraId}`)
+  }
+
+  /**
+   * Cierre graceful: detiene todas las grabaciones limpiamente
+   */
+  async gracefulStop() {
+    console.log('🛑 Iniciando cierre graceful de grabaciones...')
+    
+    const recordingKeys = Array.from(this.recordingProcesses.keys())
+    const stopPromises = []
+
+    for (const key of recordingKeys) {
+      const process = this.recordingProcesses.get(key)
+      if (process) {
+        const promise = new Promise((resolve) => {
+          // Enviar 'q' para cerrar limpiamente
+          try {
+            process.stdin.write('q')
+            process.stdin.end()
+          } catch (error) {
+            console.log(`⚠️ Error enviando 'q' a ${key}:`, error.message)
+          }
+
+          // Timeout de 5 segundos para cada proceso
+          const timeout = setTimeout(() => {
+            if (this.recordingProcesses.has(key)) {
+              console.log(`⚠️ Forzando cierre de ${key}`)
+              process.kill('SIGKILL')
+            }
+            resolve()
+          }, 5000)
+
+          process.on('close', () => {
+            clearTimeout(timeout)
+            console.log(`✅ Grabación cerrada: ${key}`)
+            resolve()
+          })
+        })
+        
+        stopPromises.push(promise)
+      }
+    }
+
+    // Esperar a que todas las grabaciones se cierren
+    await Promise.all(stopPromises)
+    
+    // Limpiar Map
+    this.recordingProcesses.clear()
+    console.log('✅ Todas las grabaciones cerradas correctamente')
   }
 }
 

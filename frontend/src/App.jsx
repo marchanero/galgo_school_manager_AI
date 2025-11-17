@@ -75,6 +75,21 @@ function AppContent() {
     localStorage.setItem('configSubTab', configSubTab)
   }, [configSubTab])
 
+  // Advertir al usuario si hay grabaciones activas antes de cerrar/recargar
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (activeRecordingsCount > 0) {
+        const message = `Hay ${activeRecordingsCount} grabación(es) en curso. ¿Estás seguro de cerrar? Las grabaciones se guardarán automáticamente.`
+        e.preventDefault()
+        e.returnValue = message
+        return message
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [activeRecordingsCount])
+
   // Obtener listado de cámaras
   useEffect(() => {
     fetchCameras()

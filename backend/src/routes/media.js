@@ -126,6 +126,21 @@ router.get('/status', (req, res) => {
   }
 })
 
+// GET /api/media/status/:cameraId - Estado de grabación de una cámara
+router.get('/status/:cameraId', (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const isRecording = mediaServerManager.isRecording(parseInt(cameraId))
+    res.json({
+      cameraId: parseInt(cameraId),
+      isRecording,
+      status: isRecording ? 'recording' : 'idle'
+    })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // GET /api/media/recordings/:cameraId - Listar grabaciones
 router.get('/recordings/:cameraId', (req, res) => {
   try {

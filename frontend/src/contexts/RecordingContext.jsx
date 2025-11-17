@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 
 const RecordingContext = createContext()
 
-export const useRecording = () => {
+// Usar "export function" en lugar de "export const" para compatibilidad con HMR
+export function useRecording() {
   const context = useContext(RecordingContext)
   if (!context) {
     throw new Error('useRecording must be used within a RecordingProvider')
@@ -10,9 +11,66 @@ export const useRecording = () => {
   return context
 }
 
-export const RecordingProvider = ({ children }) => {
-  const [recordings, setRecordings] = useState(new Map()) // Map<cameraId, recordingState>
+export function RecordingProvider({ children }) {
+  // Cargar estado de grabación desde localStorage
+  const [recordings, setRecordings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('recordingState')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        // Convertir el array guardado de vuelta a Map
+        return new Map(parsed.map(([key, value]) => [
+          key,
+          { ...value, startedAt: value.startedAt ? new Date(value.startedAt) : null }
+        ]))
+      }
+    } catch (error) {
+      console.error('Error cargando estado de grabación:', error)
+    }
+    return new Map()
+  })
+  
   const [globalRecordingStatus, setGlobalRecordingStatus] = useState('idle') // 'idle', 'starting', 'recording', 'stopping'
+
+  // Persistir estado de grabación en localStorage
+  useEffect(() => {
+    try {
+      // Convertir Map a array para poder serializar con JSON
+      const recordingsArray = Array.from(recordings.entries())
+      localStorage.setItem('recordingState', JSON.stringify(recordingsArray))
+    } catch (error) {
+      console.error('Error guardando estado de grabación:', error)
+    }
+  }, [recordings])
+
+  /**
+   * Sincroniza el estado de grabación desde el backend
+   */
+  const syncRecordingStatus = useCallback(async (cameraId, cameraName) => {
+    try {
+      const response = await fetch(`/api/media/status/${cameraId}`)
+      const data = await response.json()
+      
+      if (data.isRecording) {
+        setRecordings(prev => new Map(prev).set(cameraId, {
+          status: 'recording',
+          cameraName,
+          startedAt: new Date() // No sabemos exactamente cuándo empezó, usamos ahora
+        }))
+      } else {
+        setRecordings(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(cameraId)
+          return newMap
+        })
+      }
+      
+      return data.isRecording
+    } catch (error) {
+      console.error('Error sincronizando estado:', error)
+      return false
+    }
+  }, [])
 
   /**
    * Inicia grabación para una cámara específica
@@ -181,6 +239,7 @@ export const RecordingProvider = ({ children }) => {
     // Acciones individuales
     startRecording,
     stopRecording,
+    syncRecordingStatus,
     
     // Acciones globales
     startAllRecordings,

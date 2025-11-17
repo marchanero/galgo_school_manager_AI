@@ -251,12 +251,50 @@ httpServer.listen(PORT, () => {
   console.log(`📊 API disponible en http://localhost:${PORT}/cameras`)
 })
 
-// Manejo de errores
-process.on('SIGINT', async () => {
-  console.log('\n🛑 Deteniendo servidor...')
-  streamingService.closeAll()
-  webrtcService.stopAll()
-  mediaServerManager.stop()
-  await prisma.$disconnect()
-  process.exit(0)
+// Manejo de cierre graceful
+const gracefulShutdown = async (signal) => {
+  console.log(`\n🛑 Señal ${signal} recibida. Cerrando servidor...`)
+  
+  try {
+    // 1. Detener nuevas conexiones
+    console.log('📡 Cerrando servicios de streaming...')
+    streamingService.closeAll()
+    webrtcService.stopAll()
+    
+    // 2. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
+    console.log('💾 Guardando grabaciones en curso...')
+    await mediaServerManager.gracefulStop()
+    
+    // 3. Cerrar servidor Node Media
+    console.log('🎬 Deteniendo servidor de medios...')
+    mediaServerManager.stop()
+    
+    // 4. Desconectar base de datos
+    console.log('🗄️ Cerrando conexión a base de datos...')
+    await prisma.$disconnect()
+    
+    console.log('✅ Servidor cerrado correctamente')
+    process.exit(0)
+  } catch (error) {
+    console.error('❌ Error durante cierre:', error)
+    process.exit(1)
+  }
+}
+
+// Capturar múltiples señales de cierre
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))   // Ctrl+C
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM')) // Kill
+process.on('SIGHUP', () => gracefulShutdown('SIGHUP'))   // Terminal cerrada
+
+// Capturar errores no manejados (SOLO LOGUEAR, NO CERRAR)
+process.on('uncaughtException', (error) => {
+  console.error('❌ Error no capturado:', error)
+  console.error('Stack:', error.stack)
+  // NO cerrar el servidor, solo loguear
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Promesa rechazada no manejada:', reason)
+  console.error('Promesa:', promise)
+  // NO cerrar el servidor, solo loguear
 })

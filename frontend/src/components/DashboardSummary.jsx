@@ -29,7 +29,8 @@ const DashboardSummary = () => {
     getRecordings,
     downloadRecording,
     deleteRecording,
-    activeRecordingsCount 
+    activeRecordingsCount,
+    syncRecordingStatus
   } = useRecording()
   
   const { 
@@ -79,6 +80,11 @@ const DashboardSummary = () => {
         )
         setCameraStatus(initialStatus)
         
+        // Sincronizar estado de grabación desde el backend
+        data.forEach(camera => {
+          syncRecordingStatus(camera.id, camera.name)
+        })
+        
         // Verificar conectividad real en segundo plano (no bloqueante)
         data.forEach(async (camera) => {
           try {
@@ -100,7 +106,7 @@ const DashboardSummary = () => {
     fetchCameras()
     const interval = setInterval(fetchCameras, 30000) // Verificar cada 30 segundos
     return () => clearInterval(interval)
-  }, [])
+  }, [syncRecordingStatus])
 
   // Actualizar estadísticas
   useEffect(() => {
