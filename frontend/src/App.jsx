@@ -9,6 +9,8 @@ import RulesManager from './components/RulesManager'
 import DashboardSummary from './components/DashboardSummary'
 import ScenarioManager from './components/ScenarioManager'
 import SensorManager from './components/SensorManager'
+import ReplicationStats from './components/ReplicationStats'
+import ReplicationConfig from './components/ReplicationConfig'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { RecordingProvider, useRecording } from './contexts/RecordingContext'
@@ -377,6 +379,20 @@ function AppContent() {
                     <span>Cámaras</span>
                   </div>
                 </button>
+
+                <button
+                  onClick={() => setConfigSubTab('replication')}
+                  className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${
+                    configSubTab === 'replication'
+                      ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20'
+                      : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-2xl">🔄</span>
+                    <span>Replicación</span>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -384,6 +400,12 @@ function AppContent() {
             <div className="mt-6">
               {configSubTab === 'scenarios' && <ScenarioManager />}
               {configSubTab === 'sensors' && <SensorManager />}
+              {configSubTab === 'replication' && (
+                <div className="space-y-6">
+                  <ReplicationStats />
+                  <ReplicationConfig />
+                </div>
+              )}
               {configSubTab === 'cameras' && (
                 <div className="space-y-6">
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">

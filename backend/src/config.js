@@ -18,3 +18,17 @@ export const streamPaths = {
   mainStream: '/stream',
   subStream: '/stream?token=sub'
 }
+
+export const replication = {
+  enabled: process.env.REPLICATION_ENABLED === 'true',
+  host: process.env.REPLICATION_HOST,
+  user: process.env.REPLICATION_USER,
+  remotePath: process.env.REPLICATION_PATH,
+  sshKeyPath: process.env.REPLICATION_SSH_KEY
+}
+
+export default {
+  cameraConfig,
+  streamPaths,
+  replication
+}

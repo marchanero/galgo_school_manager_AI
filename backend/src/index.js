@@ -12,9 +12,11 @@ import webrtcRoutes, { webrtcService } from './routes/webrtc.js'
 import mqttRoutes from './routes/mqtt.js'
 import scenarioRoutes from './routes/scenarios.js'
 import sensorRoutes from './routes/sensors.js'
+import replicationRoutes from './routes/replication.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
 import mqttService from './services/mqttService.js'
+import replicationService from './services/replicationService.js'
 
 dotenv.config()
 
@@ -150,6 +152,13 @@ const initMQTT = async () => {
 // Iniciar MQTT
 setTimeout(initMQTT, 1000)
 
+// Inicializar servicio de replicación
+replicationService.init(prisma).then(() => {
+  console.log('✅ Servicio de replicación inicializado')
+}).catch(err => {
+  console.error('❌ Error inicializando replicación:', err)
+})
+
 // Auto-iniciar grabación para cámaras existentes
 // ⚠️ DESHABILITADO: El auto-inicio siempre graba sin escenario
 // Las grabaciones deben iniciarse manualmente desde el frontend para incluir el escenario activo
@@ -231,6 +240,7 @@ app.use('/api/webrtc', webrtcRoutes)
 app.use('/api/mqtt', mqttRoutes)
 app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/sensors', sensorRoutes)
+app.use('/api/replication', replicationRoutes)
 
 // Ruta de health check
 app.get('/health', (req, res) => {

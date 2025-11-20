@@ -59,6 +59,37 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/health`)
     if (!response.ok) throw new Error('Servidor no disponible')
     return response.json()
+  },
+
+  // Replicación
+  async getReplicationStats() {
+    const response = await fetch(`${API_BASE_URL}/replication/stats`)
+    if (!response.ok) throw new Error('Error al obtener estadísticas de replicación')
+    return response.json()
+  },
+
+  async getReplicationConfig() {
+    const response = await fetch(`${API_BASE_URL}/replication/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración de replicación')
+    return response.json()
+  },
+
+  async saveReplicationConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/replication/config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al guardar configuración de replicación')
+    return response.json()
+  },
+
+  async startReplication() {
+    const response = await fetch(`${API_BASE_URL}/replication/start`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al iniciar replicación')
+    return response.json()
   }
 }
 

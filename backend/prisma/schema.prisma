@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-1.1.x", "linux-arm64-openssl-3.0.x", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -132,6 +133,19 @@ model MqttConfig {
   updatedAt   DateTime @updatedAt
 
   @@map("mqtt_config")
+}
+
+// ==================== CONFIGURACIÓN DEL SISTEMA ====================
+
+model SystemConfig {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique // ej: "replication_schedule"
+  value       String   // JSON value
+  description String?
+  
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_config")
 }
 
 // ==================== ESCENARIOS/AULAS ====================

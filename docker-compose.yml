@@ -9,7 +9,7 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - DATABASE_URL=file:./dev.db
+      - DATABASE_URL=file:./prisma/dev.db
       - MQTT_BROKER=mqtt://mqtt:1883
       # Las credenciales de la cámara se deben pasar por .env o aquí
       - CAMERA_IP=${CAMERA_IP:-192.168.8.210}
