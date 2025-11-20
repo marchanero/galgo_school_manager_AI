@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
+import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
 
 const RecordingControlGlobal = () => {
@@ -9,6 +10,8 @@ const RecordingControlGlobal = () => {
     stopAllRecordings, 
     activeRecordingsCount 
   } = useRecording()
+
+  const { activeScenario } = useScenario()
   
   const [cameras, setCameras] = useState([])
   const [recordingState, setRecordingState] = useState('idle') // 'idle' | 'recording' | 'paused' | 'finished'
@@ -113,7 +116,15 @@ const RecordingControlGlobal = () => {
       return
     }
     
-    await startAllRecordings(cameras)
+    console.log('🎬 Iniciando grabación global con escenario:', {
+      scenarioId: activeScenario?.id,
+      scenarioName: activeScenario?.name
+    })
+
+    await startAllRecordings(cameras, {
+      scenarioId: activeScenario?.id,
+      scenarioName: activeScenario?.name
+    })
     setRecordingState('recording')
     setElapsedTime(0)
     setPausedTime(0)
