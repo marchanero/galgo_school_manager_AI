@@ -8,10 +8,11 @@
 - [x] Instalar dependencias
 - [x] Ejecutar migraciones de BD
 - [x] Configurar credenciales de cámaras (192.168.8.210)
+- [x] Implementar UI de replicación
 - [ ] Iniciar servidor backend
 - [ ] Iniciar servidor frontend
-- [ ] Implementar streaming RTSP con FFmpeg
-- [ ] Convertir RTSP a HLS/WebRTC
+- [x] Implementar streaming RTSP con FFmpeg
+- [x] Convertir RTSP a HLS/WebRTC
 - [ ] Agregar autenticación de usuarios
 - [ ] Mejorar UI con más funcionalidades
 - [ ] Deploy en producción

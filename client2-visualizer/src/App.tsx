@@ -5,6 +5,8 @@ import Navbar from './components/Navbar';
 import RFIDIdentification from './components/RFIDIdentification';
 import RecordingControl from './components/RecordingControl';
 import SensorCard from './components/SensorCard';
+import ReplicationConfig from './components/ReplicationConfig';
+import ReplicationStats from './components/ReplicationStats';
 import { UserProvider } from './contexts/UserContext';
 import type { MqttStatus, Sensor } from './types';
 
@@ -229,6 +231,17 @@ function App() {
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Configuración de Replicación */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                Configuración
+              </h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <ReplicationStats />
+                <ReplicationConfig />
               </div>
             </div>
 
