@@ -358,7 +358,7 @@ function AppContent() {
   }
 
   return (
-    <div className="app min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300 flex flex-col">
+    <div className="app min-h-screen bg-gray-50 dark:bg-gray-950 transition-colors duration-300 flex flex-col">
       <AppHeader 
         serverStatus={serverStatus}
         activeRecordingsCount={activeRecordingsCount}
@@ -371,12 +371,17 @@ function AppContent() {
       {/* Tab Content */}
       <div className={`flex-1 ${activeTab === 'cameras' ? 'flex overflow-hidden' : 'overflow-y-auto'}`}>
         {/* Dashboard con Sensores integrados */}
-        <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
+        <div className={activeTab === 'dashboard' ? 'block animate-fade-in' : 'hidden'}>
           <div className="max-w-7xl mx-auto p-6 space-y-6">
             <DashboardSummary />
             {/* Sensores en tiempo real integrados en Dashboard */}
             <div className="mt-8">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Sensores en Tiempo Real</h2>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                  <Radio className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sensores en Tiempo Real</h2>
+              </div>
               <SensorsDashboard />
             </div>
           </div>
@@ -425,7 +430,7 @@ function AppContent() {
             <button 
               onClick={fetchCameras} 
               disabled={loading}
-              className="w-full mt-4 flex-shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium transition-colors disabled:opacity-50"
+              className="w-full mt-4 flex-shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               {loading ? 'Cargando...' : 'Refrescar'}
@@ -434,12 +439,20 @@ function AppContent() {
 
           <main className="card flex-1 flex flex-col overflow-hidden min-h-0">
             {selectedCamera ? (
-              <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+              <div className="flex-1 overflow-hidden min-h-0 flex flex-col animate-fade-in">
                 <WebRTCViewer camera={selectedCamera} />
               </div>
             ) : (
-              <div className="flex items-center justify-center flex-1 text-gray-500 dark:text-gray-400">
-                <p className="text-xl">Selecciona una cámara</p>
+              <div className="flex flex-col items-center justify-center flex-1 animate-fade-in">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 flex items-center justify-center mb-4">
+                  <Video className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Visor de Cámara
+                </h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Selecciona una cámara de la lista para ver el stream
+                </p>
               </div>
             )}
           </main>
@@ -447,17 +460,19 @@ function AppContent() {
 
         {/* Reglas */}
         {activeTab === 'rules' && (
-          <div className="max-w-7xl mx-auto p-6">
+          <div className="max-w-7xl mx-auto p-6 animate-fade-in">
             <RulesManager />
           </div>
         )}
 
         {/* Configuración - usa componente separado */}
         {activeTab === 'config' && (
-          <ConfigurationContent 
-            configSubTab={configSubTab}
-            setConfigSubTab={setConfigSubTab}
-          />
+          <div className="animate-fade-in">
+            <ConfigurationContent 
+              configSubTab={configSubTab}
+              setConfigSubTab={setConfigSubTab}
+            />
+          </div>
         )}
       </div>
 
