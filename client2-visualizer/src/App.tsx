@@ -5,7 +5,6 @@ import Navbar from './components/Navbar';
 import RFIDIdentification from './components/RFIDIdentification';
 import RecordingControl from './components/RecordingControl';
 import SensorCard from './components/SensorCard';
-import ReplicationConfig from './components/ReplicationConfig';
 import ReplicationStats from './components/ReplicationStats';
 import { UserProvider } from './contexts/UserContext';
 import type { MqttStatus, Sensor } from './types';
@@ -107,21 +106,16 @@ function App() {
   const stopRecording = async () => {
     try {
       await axios.post(`${API_URL}/api/recording/stop`);
-      setRecordingState('idle');
-      setRecordingDuration(0);
-      setPausedTime(0);
-      setTotalRecordingTime(0);
+      // Mostrar resumen por 5 segundos antes de volver a idle
+      setRecordingState('finished');
+      setTimeout(() => {
+        setRecordingState('idle');
+        setRecordingDuration(0);
+        setPausedTime(0);
+        setTotalRecordingTime(0);
+      }, 5000);
     } catch (error) {
       console.error('❌ Error stopping recording:', error);
-    }
-  };
-
-  const finishRecording = async () => {
-    try {
-      await axios.post(`${API_URL}/api/recording/stop`);
-      setRecordingState('finished');
-    } catch (error) {
-      console.error('❌ Error finishing recording:', error);
     }
   };
 
@@ -188,7 +182,6 @@ function App() {
                 onPause={pauseRecording}
                 onResume={resumeRecording}
                 onStop={stopRecording}
-                onFinish={finishRecording}
               />
 
               {/* Identificación de Usuario */}
@@ -234,15 +227,12 @@ function App() {
               </div>
             </div>
 
-            {/* Configuración de Replicación */}
+            {/* Estado de Replicación */}
             <div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Configuración
+                Estado del Sistema
               </h2>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ReplicationStats />
-                <ReplicationConfig />
-              </div>
+              <ReplicationStats />
             </div>
 
             {/* Dispositivos Conectados */}

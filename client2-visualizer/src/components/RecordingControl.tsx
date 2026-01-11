@@ -11,7 +11,6 @@ interface RecordingControlProps {
   onPause: () => void
   onResume: () => void
   onStop: () => void
-  onFinish: () => void
 }
 
 const RecordingControl: React.FC<RecordingControlProps> = ({
@@ -22,8 +21,7 @@ const RecordingControl: React.FC<RecordingControlProps> = ({
   onStart,
   onPause,
   onResume,
-  onStop,
-  onFinish
+  onStop
 }) => {
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
@@ -181,7 +179,7 @@ const RecordingControl: React.FC<RecordingControlProps> = ({
 
           {/* Botones de acción adicionales para móvil */}
           {(recordingState === 'recording' || recordingState === 'paused') && (
-            <div className="mt-4 flex justify-center space-x-4">
+            <div className="mt-4 flex justify-center">
               <button
                 onClick={onStop}
                 className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
@@ -191,18 +189,6 @@ const RecordingControl: React.FC<RecordingControlProps> = ({
                 </svg>
                 <span>Detener</span>
               </button>
-
-              {recordingState === 'paused' && (
-                <button
-                  onClick={onFinish}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Finalizar</span>
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -310,7 +296,7 @@ const RecordingControl: React.FC<RecordingControlProps> = ({
 
           {/* Botones de acción adicionales */}
           {(recordingState === 'recording' || recordingState === 'paused') && (
-            <div className="flex justify-center space-x-4">
+            <div className="flex justify-center">
               <button
                 onClick={onStop}
                 className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
@@ -320,18 +306,6 @@ const RecordingControl: React.FC<RecordingControlProps> = ({
                 </svg>
                 <span>Detener</span>
               </button>
-
-              {recordingState === 'paused' && (
-                <button
-                  onClick={onFinish}
-                  className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Finalizar</span>
-                </button>
-              )}
             </div>
           )}
         </div>
