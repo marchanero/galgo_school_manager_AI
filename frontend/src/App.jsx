@@ -374,13 +374,17 @@ function AppContent() {
         <div className={activeTab === 'dashboard' ? 'block animate-fade-in' : 'hidden'}>
           <div className="max-w-7xl mx-auto p-6 space-y-6">
             <DashboardSummary />
-            {/* Sensores en tiempo real integrados en Dashboard */}
+            
+            {/* Dashboard técnico de sensores */}
             <div className="mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                   <Radio className="w-4 h-4 text-white" />
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Sensores en Tiempo Real</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Dashboard Técnico</h2>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Métricas avanzadas y configuración de sensores
+                </span>
               </div>
               <SensorsDashboard />
             </div>

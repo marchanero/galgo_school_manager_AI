@@ -77,7 +77,7 @@
   }
 
   .spinner {
-    @apply w-10 h-10 border-3 border-blue-500/30 border-t-blue-500 rounded-full;
+    @apply w-10 h-10 border-[3px] border-blue-500/30 border-t-blue-500 rounded-full;
     animation: spin 1s linear infinite;
   }
 
