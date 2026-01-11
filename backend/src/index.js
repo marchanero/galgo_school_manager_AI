@@ -13,6 +13,7 @@ import mqttRoutes from './routes/mqtt.js'
 import scenarioRoutes from './routes/scenarios.js'
 import sensorRoutes from './routes/sensors.js'
 import replicationRoutes from './routes/replication.js'
+import emqxRoutes from './routes/emqx.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
 import mqttService from './services/mqttService.js'
@@ -241,6 +242,7 @@ app.use('/api/mqtt', mqttRoutes)
 app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/sensors', sensorRoutes)
 app.use('/api/replication', replicationRoutes)
+app.use('/api/emqx', emqxRoutes)
 
 // Ruta de health check
 app.get('/health', (req, res) => {
