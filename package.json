@@ -1,4 +1,27 @@
 {
+  "name": "camera-rtsp-project",
+  "version": "1.0.0",
+  "description": "Proyecto completo de visualización de cámaras RTSP con múltiples componentes",
+  "scripts": {
+    "install:all": "npm install && npm run install:backend && npm run install:frontend && npm run install:client2 && npm run install:test-publisher",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:client2": "cd client2-visualizer && npm install",
+    "install:test-publisher": "cd test_publisher && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:client2\" \"npm run dev:test-publisher\" \"npm run dev:mosquitto\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:client2": "cd client2-visualizer && npm run dev",
+    "dev:test-publisher": "cd test_publisher && npm start",
+    "dev:mosquitto": "docker-compose up -d mqtt",
+    "stop": "docker-compose down && pkill -f 'npm run dev' || true",
+    "build": "npm run build:frontend && npm run build:client2",
+    "build:frontend": "cd frontend && npm run build",
+    "build:client2": "cd client2-visualizer && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
   "dependencies": {
     "node-cron": "^4.2.1"
   }
