@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import './App.css'
+import { Toaster, toast } from 'react-hot-toast'
 import CameraList from './components/CameraList'
 import WebRTCViewer from './components/WebRTCViewer'
 import CameraModal from './components/CameraModal'
@@ -11,6 +12,7 @@ import ScenarioManager from './components/ScenarioManager'
 import SensorManager from './components/SensorManager'
 import ReplicationStats from './components/ReplicationStats'
 import ReplicationConfig from './components/ReplicationConfig'
+import { ListItemSkeleton } from './components/ui/Skeleton'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
 import { RecordingProvider, useRecording } from './contexts/RecordingContext'
@@ -31,7 +33,10 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  Dog
+  Dog,
+  Theater,
+  Radio,
+  FolderSync
 } from 'lucide-react'
 
 // Componente Header separado
@@ -124,9 +129,9 @@ function AppHeader({ serverStatus, activeRecordingsCount, theme, toggleTheme, ac
 // Componente para el contenido de Configuración
 function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   const configTabs = [
-    { id: 'scenarios', label: 'Escenarios', icon: '🎭', color: 'blue' },
-    { id: 'sensors', label: 'Sensores', icon: '📡', color: 'green' },
-    { id: 'replication', label: 'Replicación', icon: '🔄', color: 'purple' }
+    { id: 'scenarios', label: 'Escenarios', icon: Theater, color: 'blue' },
+    { id: 'sensors', label: 'Sensores', icon: Radio, color: 'green' },
+    { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' }
   ]
 
   const getTabClasses = (tab, isActive) => {
@@ -143,29 +148,38 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   return (
     <div className="max-w-7xl mx-auto p-6">
       <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          ⚙️ Configuración del Sistema
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gray-600 to-gray-800 dark:from-gray-500 dark:to-gray-700 flex items-center justify-center">
+            <Settings className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Configuración del Sistema
+          </h2>
+        </div>
+        <p className="text-gray-600 dark:text-gray-400 ml-13">
           Gestiona escenarios, sensores y replicación del sistema
         </p>
       </div>
 
       {/* Tabs de Configuración */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg mb-6">
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          {configTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setConfigSubTab(tab.id)}
-              className={`flex-1 px-6 py-4 text-center font-medium transition-colors ${getTabClasses(tab, configSubTab === tab.id)}`}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </div>
-            </button>
-          ))}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-hidden">
+        <div className="flex">
+          {configTabs.map(tab => {
+            const Icon = tab.icon
+            const isActive = configSubTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setConfigSubTab(tab.id)}
+                className={`flex-1 px-6 py-4 font-medium transition-all duration-200 ${getTabClasses(tab, isActive)}`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Icon className={`w-5 h-5 ${isActive ? '' : 'opacity-70'}`} />
+                  <span>{tab.label}</span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -297,8 +311,10 @@ function AppContent() {
         scenarioName: activeScenario?.name
       })
       
+      toast.success(`Cámara "${newCamera.name}" agregada correctamente`)
       setError(null)
     } catch (err) {
+      toast.error(`Error al crear cámara: ${err.message}`)
       setError(`Error al crear cámara: ${err.message}`)
     }
   }
@@ -322,6 +338,7 @@ function AppContent() {
   }
 
   const confirmDeleteCamera = async () => {
+    const cameraName = confirmDelete.cameraName
     try {
       // Detener grabación primero
       await stopRecording(confirmDelete.cameraId)
@@ -332,8 +349,10 @@ function AppContent() {
         setSelectedCamera(null)
       }
       setConfirmDelete({ isOpen: false, cameraId: null, cameraName: '' })
+      toast.success(`Cámara "${cameraName}" eliminada`)
       setError(null)
     } catch (err) {
+      toast.error(`Error al eliminar cámara: ${err.message}`)
       setError(`Error al eliminar cámara: ${err.message}`)
     }
   }
@@ -380,21 +399,36 @@ function AppContent() {
               </button>
             </div>
             
-            {loading && <p className="text-sm text-gray-500 flex items-center gap-2"><RefreshCw className="w-4 h-4 animate-spin" /> Cargando...</p>}
-            {error && <p className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</p>}
+            {error && (
+              <div className="mb-3 p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                {error}
+              </div>
+            )}
             
             <div className="flex-1 overflow-y-auto min-h-0">
-              <CameraList 
-                cameras={cameras} 
-                selectedCamera={selectedCamera}
-                onSelectCamera={setSelectedCamera}
-                onDeleteCamera={handleDeleteCamera}
-              />
+              {loading ? (
+                <div className="space-y-2">
+                  <ListItemSkeleton />
+                  <ListItemSkeleton />
+                  <ListItemSkeleton />
+                </div>
+              ) : (
+                <CameraList 
+                  cameras={cameras} 
+                  selectedCamera={selectedCamera}
+                  onSelectCamera={setSelectedCamera}
+                  onDeleteCamera={handleDeleteCamera}
+                />
+              )}
             </div>
             
-            <button onClick={fetchCameras} className="w-full mt-4 flex-shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium transition-colors">
-              <RefreshCw className="w-4 h-4" />
-              Refrescar
+            <button 
+              onClick={fetchCameras} 
+              disabled={loading}
+              className="w-full mt-4 flex-shrink-0 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Cargando...' : 'Refrescar'}
             </button>
           </aside>
 
@@ -454,6 +488,30 @@ function App() {
         <MQTTProvider>
           <RecordingProvider>
             <AppContent />
+            <Toaster 
+              position="bottom-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#1f2937',
+                  color: '#f9fafb',
+                  borderRadius: '12px',
+                  padding: '12px 16px',
+                },
+                success: {
+                  iconTheme: {
+                    primary: '#10b981',
+                    secondary: '#f9fafb',
+                  },
+                },
+                error: {
+                  iconTheme: {
+                    primary: '#ef4444',
+                    secondary: '#f9fafb',
+                  },
+                },
+              }}
+            />
           </RecordingProvider>
         </MQTTProvider>
       </ScenarioProvider>
