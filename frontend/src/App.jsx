@@ -75,20 +75,18 @@ function AppHeader({ serverStatus, activeRecordingsCount, theme, toggleTheme, ac
 }
 
 // Componente para el contenido de Configuración
-function ConfigurationContent({ configSubTab, setConfigSubTab, cameras, selectedCamera, setSelectedCamera, setActiveTab, setIsModalOpen, handleDeleteRequest }) {
+function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   const configTabs = [
     { id: 'scenarios', label: 'Escenarios', icon: '🎭', color: 'blue' },
     { id: 'sensors', label: 'Sensores', icon: '📡', color: 'green' },
-    { id: 'cameras', label: 'Cámaras', icon: '📹', color: 'purple' },
-    { id: 'replication', label: 'Replicación', icon: '🔄', color: 'orange' }
+    { id: 'replication', label: 'Replicación', icon: '🔄', color: 'purple' }
   ]
 
   const getTabClasses = (tab, isActive) => {
     const colors = {
       blue: isActive ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' : '',
       green: isActive ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-900/20' : '',
-      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : '',
-      orange: isActive ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20' : ''
+      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : ''
     }
     return isActive 
       ? colors[tab.color]
@@ -102,7 +100,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab, cameras, selected
           ⚙️ Configuración del Sistema
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          Gestiona escenarios, sensores y cámaras del sistema
+          Gestiona escenarios, sensores y replicación del sistema
         </p>
       </div>
 
@@ -134,108 +132,6 @@ function ConfigurationContent({ configSubTab, setConfigSubTab, cameras, selected
             <ReplicationConfig />
           </div>
         )}
-        {configSubTab === 'cameras' && (
-          <CamerasGrid 
-            cameras={cameras}
-            selectedCamera={selectedCamera}
-            setSelectedCamera={setSelectedCamera}
-            setActiveTab={setActiveTab}
-            setIsModalOpen={setIsModalOpen}
-            handleDeleteRequest={handleDeleteRequest}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Componente Grid de Cámaras para Configuración
-function CamerasGrid({ cameras, selectedCamera, setSelectedCamera, setActiveTab, setIsModalOpen, handleDeleteRequest }) {
-  return (
-    <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              📹 Gestión de Cámaras
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Administra las cámaras RTSP del sistema
-            </p>
-          </div>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
-          >
-            ➕ Nueva Cámara
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cameras.map(camera => (
-            <div
-              key={camera.id}
-              className={`bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 border-2 transition-all cursor-pointer ${
-                selectedCamera?.id === camera.id
-                  ? 'border-blue-500 dark:border-blue-400'
-                  : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
-              onClick={() => setSelectedCamera(camera)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">📹</span>
-                  <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white">{camera.name}</h4>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      camera.isActive
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {camera.isActive ? 'Activa' : 'Inactiva'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {camera.description && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{camera.description}</p>
-              )}
-              
-              <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-2 rounded font-mono truncate mb-3">
-                {camera.rtspUrl}
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedCamera(camera)
-                    setActiveTab('cameras')
-                  }}
-                  className="flex-1 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-lg transition-colors"
-                >
-                  👁️ Ver Stream
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteRequest(camera.id, camera.name)
-                  }}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))}
-          
-          {cameras.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-500 dark:text-gray-400">
-              No hay cámaras registradas. Agrega una nueva para comenzar.
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
@@ -476,12 +372,6 @@ function AppContent() {
           <ConfigurationContent 
             configSubTab={configSubTab}
             setConfigSubTab={setConfigSubTab}
-            cameras={cameras}
-            selectedCamera={selectedCamera}
-            setSelectedCamera={setSelectedCamera}
-            setActiveTab={setActiveTab}
-            setIsModalOpen={setIsModalOpen}
-            handleDeleteRequest={handleDeleteRequest}
           />
         )}
       </div>
