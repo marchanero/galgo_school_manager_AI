@@ -3,6 +3,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
+import videoProcessor from './videoProcessor.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -391,6 +392,11 @@ class MediaServerManager {
         clearTimeout(timeout)
         this.recordingProcesses.delete(recordKey)
         console.log(`✅ Grabación guardada correctamente: camera_${cameraId}${scenarioInfo}`)
+        
+        // Generar thumbnail automáticamente
+        if (recordingData.outputDir) {
+          this._generateThumbnailsForRecording(recordingData.outputDir, cameraId)
+        }
       })
       
       return recordingData
@@ -398,6 +404,51 @@ class MediaServerManager {
       console.log(`⚠️ No hay grabación activa para camera_${cameraId}`)
       return null
     }
+  }
+
+  /**
+   * Genera thumbnails para los videos de una grabación
+   * @private
+   */
+  async _generateThumbnailsForRecording(outputDir, cameraId) {
+    try {
+      // Esperar un momento para que el archivo se escriba completamente
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      if (!fs.existsSync(outputDir)) {
+        console.log(`⚠️ Directorio de grabación no encontrado: ${outputDir}`)
+        return
+      }
+      
+      const files = fs.readdirSync(outputDir)
+        .filter(f => f.endsWith('.mp4'))
+        .sort() // Ordenar para obtener el más reciente
+      
+      if (files.length === 0) {
+        console.log(`⚠️ No se encontraron videos en: ${outputDir}`)
+        return
+      }
+      
+      // Generar thumbnail del video más reciente
+      const latestVideo = files[files.length - 1]
+      const videoPath = path.join(outputDir, latestVideo)
+      
+      console.log(`🖼️ Generando thumbnail para: ${latestVideo}`)
+      
+      // Añadir a la cola de procesamiento con prioridad alta
+      videoProcessor.addToQueue({
+        type: 'thumbnail',
+        videoPath,
+        options: { timestamp: '00:00:03' },
+        priority: 1,
+        cameraId
+      })
+      
+      console.log(`✅ Thumbnail añadido a la cola para camera_${cameraId}`)
+    } catch (error) {
+      console.error(`❌ Error generando thumbnail para camera_${cameraId}:`, error.message)
+    }
+  }
   }
 
   /**

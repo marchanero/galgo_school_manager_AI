@@ -121,12 +121,45 @@ recordingManager.on('recordingStarted', (data) => {
   }).catch(err => console.error('Error publicando inicio grabación:', err))
 })
 
-recordingManager.on('recordingStopped', (data) => {
+recordingManager.on('recordingStopped', async (data) => {
   console.log(`⏹️ Grabación detenida: ${data.cameraName}`)
   mqttService.publish('camera_rtsp/recordings/stopped', {
     ...data,
     timestamp: new Date().toISOString()
   }).catch(err => console.error('Error publicando parada grabación:', err))
+  
+  // Generar thumbnails automáticamente
+  if (data.outputDir) {
+    try {
+      // Esperar a que el archivo se escriba completamente
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      const fs = await import('fs')
+      const path = await import('path')
+      
+      if (fs.existsSync(data.outputDir)) {
+        const files = fs.readdirSync(data.outputDir)
+          .filter(f => f.endsWith('.mp4'))
+          .sort()
+        
+        if (files.length > 0) {
+          const latestVideo = files[files.length - 1]
+          const videoPath = path.join(data.outputDir, latestVideo)
+          
+          console.log(`🖼️ Generando thumbnail para: ${latestVideo}`)
+          videoProcessor.addToQueue({
+            type: 'thumbnail',
+            videoPath,
+            options: { timestamp: '00:00:03' },
+            priority: 1,
+            cameraId: data.cameraId
+          })
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Error generando thumbnail:`, error.message)
+    }
+  }
 })
 
 recordingManager.on('recordingFailed', (data) => {

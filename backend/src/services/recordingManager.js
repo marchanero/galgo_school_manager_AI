@@ -394,7 +394,9 @@ class RecordingManager extends EventEmitter {
           cameraId: recording.cameraId,
           cameraName: recording.cameraName,
           duration: Date.now() - recording.startTime.getTime(),
-          framesProcessed: recording.framesProcessed
+          framesProcessed: recording.framesProcessed,
+          outputDir: recording.outputDir,
+          scenarioName: recording.scenarioName
         })
         
         resolve({
