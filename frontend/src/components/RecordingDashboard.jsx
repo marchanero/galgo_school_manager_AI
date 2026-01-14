@@ -46,6 +46,8 @@ export default function RecordingDashboard() {
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, recording: null })
   // Estado para generación de thumbnails
   const [generatingThumbnail, setGeneratingThumbnail] = useState(null)
+  // Estado para forzar recarga de thumbnails
+  const [thumbnailVersion, setThumbnailVersion] = useState(Date.now())
 
   // Cargar datos - combina grabaciones de recordingManager y mediaServer
   const loadData = useCallback(async () => {
@@ -60,8 +62,10 @@ export default function RecordingDashboard() {
       // Grabaciones del recordingManager
       const recordingManagerRecs = statusRes.data?.recordings || []
       
-      // Grabaciones guardadas
-      setSavedRecordings(storageRes.data?.recordings || [])
+      // Grabaciones guardadas (solo videos mp4, no archivos de sensores)
+      const allRecordings = storageRes.data?.recordings || []
+      const videoRecordings = allRecordings.filter(r => r.type === 'video')
+      setSavedRecordings(videoRecordings)
       
       // Grabaciones del mediaServer (convertir al mismo formato)
       const mediaServerRecs = (mediaRes.recordingDetails || []).map(detail => ({
@@ -200,8 +204,11 @@ export default function RecordingDashboard() {
         recording.filename
       )
       toast.success('Thumbnail añadido a la cola de procesamiento')
-      // Recargar después de un momento para que se genere
-      setTimeout(() => loadData(), 3000)
+      // Esperar a que se genere y forzar recarga de thumbnails
+      setTimeout(() => {
+        setThumbnailVersion(Date.now())
+        loadData()
+      }, 3000)
     } catch (error) {
       console.error('Error generando thumbnail:', error)
       toast.error('Error al generar thumbnail')
@@ -269,9 +276,13 @@ export default function RecordingDashboard() {
 
   // Obtener URL del thumbnail para un video
   const getThumbnailUrl = (recording) => {
-    // Construir la URL del thumbnail basándose en el nombre del video
-    const videoName = recording.filename?.replace('.mp4', '') || ''
-    return `/api/storage/thumbnail/${videoName}_thumb.jpg`
+    // El video tiene formato: Aula_Magna_Galgo_Cam_2026-01-14_13-01-30_%03d.mp4
+    // El thumbnail tiene formato: Aula_Magna_Galgo_Cam_2026-01-14_13-01-30_001_thumb.jpg
+    let videoName = recording.filename?.replace('.mp4', '') || ''
+    // Reemplazar el patrón %03d por 001 (el primer segmento)
+    videoName = videoName.replace('%03d', '001')
+    // Añadir timestamp para forzar recarga cuando se genera nuevo thumbnail
+    return `/api/storage/thumbnail/${videoName}_thumb.jpg?t=${thumbnailVersion}`
   }
 
   // Construir URL de descarga

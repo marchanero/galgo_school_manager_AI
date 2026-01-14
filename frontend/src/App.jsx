@@ -16,6 +16,7 @@ import StorageManager from './components/StorageManager'
 import RecordingDashboard from './components/RecordingDashboard'
 import VideoProcessing from './components/VideoProcessing'
 import PerformanceDashboard from './components/PerformanceDashboard'
+import MQTTConfig from './components/MQTTConfig'
 import { ListItemSkeleton } from './components/ui/Skeleton'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
@@ -139,6 +140,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   const configTabs = [
     { id: 'scenarios', label: 'Escenarios', icon: Theater, color: 'blue' },
     { id: 'sensors', label: 'Sensores', icon: Radio, color: 'green' },
+    { id: 'mqtt', label: 'MQTT', icon: Wifi, color: 'violet' },
     { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' },
     { id: 'storage', label: 'Almacenamiento', icon: HardDrive, color: 'orange' },
     { id: 'recordings', label: 'Grabaciones', icon: Film, color: 'red' },
@@ -150,6 +152,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
     const colors = {
       blue: isActive ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' : '',
       green: isActive ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-900/20' : '',
+      violet: isActive ? 'text-violet-600 dark:text-violet-400 border-b-2 border-violet-600 dark:border-violet-400 bg-violet-50 dark:bg-violet-900/20' : '',
       purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : '',
       orange: isActive ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20' : '',
       red: isActive ? 'text-red-600 dark:text-red-400 border-b-2 border-red-600 dark:border-red-400 bg-red-50 dark:bg-red-900/20' : '',
@@ -179,7 +182,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
 
       {/* Tabs de Configuración */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
           {configTabs.map(tab => {
             const Icon = tab.icon
             const isActive = configSubTab === tab.id
@@ -203,6 +206,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
       <div className="mt-6">
         {configSubTab === 'scenarios' && <ScenarioManager />}
         {configSubTab === 'sensors' && <SensorManager />}
+        {configSubTab === 'mqtt' && <MQTTConfig />}
         {configSubTab === 'replication' && (
           <div className="space-y-6">
             <ReplicationStats />

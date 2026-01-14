@@ -510,11 +510,12 @@ router.post('/generate-thumbnail', async (req, res) => {
     // Importar videoProcessor
     const videoProcessor = (await import('../services/videoProcessor.js')).default
     
-    // Añadir a la cola de procesamiento
+    // Añadir a la cola de procesamiento con timestamp de 1 segundo
+    // para compatibilidad con videos cortos
     videoProcessor.addToQueue({
       type: 'thumbnail',
       videoPath,
-      options: { timestamp: '00:00:03' },
+      options: { timestamp: '00:00:01' },
       priority: 1,
       cameraId
     })

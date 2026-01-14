@@ -140,10 +140,15 @@ class VideoProcessor extends EventEmitter {
   async generateThumbnail(videoPath, options = {}) {
     const {
       outputPath,
-      timestamp = '00:00:05', // 5 segundos por defecto
+      timestamp = '00:00:01', // 1 segundo por defecto (más seguro para videos cortos)
       width = this.config.thumbnailWidth,
       height = this.config.thumbnailHeight
     } = options
+    
+    // Verificar que el video existe
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Video no encontrado: ${videoPath}`)
+    }
     
     // Determinar ruta de salida
     const videoName = path.basename(videoPath, path.extname(videoPath))
@@ -152,6 +157,8 @@ class VideoProcessor extends EventEmitter {
       `${videoName}_thumb.${this.config.thumbnailFormat}`
     )
     
+    console.log(`📸 Generando thumbnail: ${videoPath} -> ${thumbPath}`)
+    
     // Asegurar directorio
     const thumbDir = path.dirname(thumbPath)
     if (!fs.existsSync(thumbDir)) {
@@ -159,9 +166,10 @@ class VideoProcessor extends EventEmitter {
     }
     
     return new Promise((resolve, reject) => {
+      // -ss antes de -i para seek rápido (input seeking)
       const args = [
-        '-i', videoPath,
         '-ss', timestamp,
+        '-i', videoPath,
         '-vframes', '1',
         '-vf', `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
         '-q:v', Math.round((100 - this.config.thumbnailQuality) / 3).toString(),
@@ -169,14 +177,21 @@ class VideoProcessor extends EventEmitter {
         thumbPath
       ]
       
-      const process = spawn(this.config.ffmpegPath, args)
+      const ffmpegProcess = spawn(this.config.ffmpegPath, args)
+      let stderrOutput = ''
       
-      process.on('error', (error) => {
+      ffmpegProcess.stderr.on('data', (data) => {
+        stderrOutput += data.toString()
+      })
+      
+      ffmpegProcess.on('error', (error) => {
+        console.error(`❌ FFmpeg spawn error: ${error.message}`)
         reject(new Error(`FFmpeg error: ${error.message}`))
       })
       
-      process.on('close', (code) => {
+      ffmpegProcess.on('close', (code) => {
         if (code === 0 && fs.existsSync(thumbPath)) {
+          console.log(`✅ Thumbnail generado: ${thumbPath}`)
           this.stats.thumbnailsGenerated++
           resolve({
             success: true,
@@ -184,7 +199,9 @@ class VideoProcessor extends EventEmitter {
             relativePath: path.relative(process.cwd(), thumbPath)
           })
         } else {
-          reject(new Error(`Thumbnail generation failed with code ${code}`))
+          const errorMsg = stderrOutput.split('\n').slice(-5).join('\n')
+          console.error(`❌ Thumbnail generation failed (code ${code}): ${errorMsg}`)
+          reject(new Error(`Thumbnail generation failed with code ${code}: ${errorMsg}`))
         }
       })
     })
@@ -591,6 +608,7 @@ class VideoProcessor extends EventEmitter {
         this.emit('taskCompleted', task)
         
       } catch (error) {
+        console.error(`❌ Task ${task.type} failed for ${task.videoPath}:`, error.message)
         task.status = 'failed'
         task.completedAt = new Date()
         task.error = error.message

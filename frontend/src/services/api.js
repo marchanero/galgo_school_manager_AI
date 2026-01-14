@@ -298,11 +298,11 @@ export const api = {
     return response.json()
   },
 
-  async generateThumbnail(data) {
-    const response = await fetch(`${API_BASE_URL}/processing/thumbnail`, {
+  async generateThumbnail(scenario, date, cameraId, filename) {
+    const response = await fetch(`${API_BASE_URL}/storage/generate-thumbnail`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ scenario, date, cameraId, filename })
     })
     if (!response.ok) throw new Error('Error al generar thumbnail')
     return response.json()

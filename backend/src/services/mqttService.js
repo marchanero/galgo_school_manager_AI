@@ -27,6 +27,53 @@ class MQTTService extends EventEmitter {
       errors: 0,
       lastMessageTime: null
     }
+    
+    // Cargar configuración de la base de datos
+    this.loadConfigFromDB()
+  }
+
+  /**
+   * Carga la configuración MQTT desde la base de datos
+   */
+  async loadConfigFromDB() {
+    try {
+      const dbConfig = await prisma.mqttConfig.findFirst({ where: { isActive: true } })
+      if (dbConfig) {
+        this.config = {
+          broker: dbConfig.broker,
+          username: dbConfig.username,
+          password: dbConfig.password,
+          clientId: dbConfig.clientId || `camera_rtsp_${Date.now()}`
+        }
+        console.log('✅ Configuración MQTT cargada de la base de datos:', dbConfig.broker)
+      }
+    } catch (error) {
+      console.log('⚠️ Usando configuración MQTT por defecto:', error.message)
+    }
+  }
+
+  /**
+   * Actualiza la configuración MQTT en caliente
+   */
+  async updateConfig(newConfig) {
+    const wasConnected = this.isConnected
+    
+    if (wasConnected) {
+      await this.disconnect()
+    }
+    
+    this.config = {
+      broker: newConfig.broker || this.config.broker,
+      username: newConfig.username || this.config.username,
+      password: newConfig.password || this.config.password,
+      clientId: newConfig.clientId || this.config.clientId
+    }
+    
+    if (wasConnected) {
+      await this.connect()
+    }
+    
+    return this.config
   }
 
   /**
