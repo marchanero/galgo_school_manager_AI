@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import { 
-  CpuChipIcon, 
-  ServerIcon,
-  BoltIcon,
-  ArrowPathIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  PlayIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  SignalIcon,
-  ClockIcon
-} from '@heroicons/react/24/outline'
+  Cpu as CpuChipIcon, 
+  Server as ServerIcon,
+  Zap as BoltIcon,
+  RefreshCw as ArrowPathIcon,
+  BarChart2 as ChartBarIcon,
+  Settings as Cog6ToothIcon,
+  Play as PlayIcon,
+  CheckCircle as CheckCircleIcon,
+  XCircle as XCircleIcon,
+  Activity as SignalIcon,
+  Clock as ClockIcon
+} from 'lucide-react'
 
 /**
  * PerformanceDashboard - Panel de monitoreo y optimización de rendimiento

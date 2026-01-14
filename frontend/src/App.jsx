@@ -12,6 +12,10 @@ import ScenarioManager from './components/ScenarioManager'
 import SensorManager from './components/SensorManager'
 import ReplicationStats from './components/ReplicationStats'
 import ReplicationConfig from './components/ReplicationConfig'
+import StorageManager from './components/StorageManager'
+import PerformanceDashboard from './components/PerformanceDashboard'
+import VideoProcessing from './components/VideoProcessing'
+import RecordingDashboard from './components/RecordingDashboard'
 import { ListItemSkeleton } from './components/ui/Skeleton'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
@@ -36,7 +40,10 @@ import {
   Dog,
   Theater,
   Radio,
-  FolderSync
+  FolderSync,
+  HardDrive,
+  Zap,
+  Film
 } from 'lucide-react'
 
 // Componente Header separado
@@ -131,14 +138,20 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   const configTabs = [
     { id: 'scenarios', label: 'Escenarios', icon: Theater, color: 'blue' },
     { id: 'sensors', label: 'Sensores', icon: Radio, color: 'green' },
-    { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' }
+    { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' },
+    { id: 'storage', label: 'Almacenamiento', icon: HardDrive, color: 'orange' },
+    { id: 'performance', label: 'Rendimiento', icon: Zap, color: 'yellow' },
+    { id: 'processing', label: 'Procesamiento', icon: Film, color: 'red' }
   ]
 
   const getTabClasses = (tab, isActive) => {
     const colors = {
       blue: isActive ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' : '',
       green: isActive ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-900/20' : '',
-      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : ''
+      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : '',
+      orange: isActive ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20' : '',
+      yellow: isActive ? 'text-yellow-600 dark:text-yellow-400 border-b-2 border-yellow-600 dark:border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' : '',
+      red: isActive ? 'text-red-600 dark:text-red-400 border-b-2 border-red-600 dark:border-red-400 bg-red-50 dark:bg-red-900/20' : ''
     }
     return isActive 
       ? colors[tab.color]
@@ -157,7 +170,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
           </h2>
         </div>
         <p className="text-gray-600 dark:text-gray-400 ml-13">
-          Gestiona escenarios, sensores y replicación del sistema
+          Gestiona escenarios, sensores, replicación, almacenamiento, rendimiento y procesamiento de video
         </p>
       </div>
 
@@ -193,6 +206,9 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
             <ReplicationConfig />
           </div>
         )}
+        {configSubTab === 'storage' && <StorageManager />}
+        {configSubTab === 'performance' && <PerformanceDashboard />}
+        {configSubTab === 'processing' && <VideoProcessing />}
       </div>
     </div>
   )
@@ -374,6 +390,20 @@ function AppContent() {
         <div className={activeTab === 'dashboard' ? 'block animate-fade-in' : 'hidden'}>
           <div className="max-w-7xl mx-auto p-6 space-y-6">
             <DashboardSummary />
+            
+            {/* Dashboard de grabaciones resilientes */}
+            <div className="mt-8">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center">
+                  <Circle className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Estado de Grabaciones</h2>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  Monitoreo en tiempo real de grabaciones activas
+                </span>
+              </div>
+              <RecordingDashboard />
+            </div>
             
             {/* Dashboard técnico de sensores */}
             <div className="mt-8">

@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import { 
-  PhotoIcon, 
-  FilmIcon, 
-  ScissorsIcon,
-  ArrowPathIcon,
-  PlayIcon,
-  StopIcon,
-  TrashIcon,
-  Cog6ToothIcon,
-  FolderOpenIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ExclamationCircleIcon
-} from '@heroicons/react/24/outline'
+  Image as PhotoIcon, 
+  Film as FilmIcon, 
+  Scissors as ScissorsIcon,
+  RefreshCw as ArrowPathIcon,
+  Play as PlayIcon,
+  Square as StopIcon,
+  Trash2 as TrashIcon,
+  Settings as Cog6ToothIcon,
+  FolderOpen as FolderOpenIcon,
+  Clock as ClockIcon,
+  CheckCircle as CheckCircleIcon,
+  XCircle as XCircleIcon,
+  AlertCircle as ExclamationCircleIcon
+} from 'lucide-react'
 
 /**
  * VideoProcessing - Panel de post-procesamiento de video

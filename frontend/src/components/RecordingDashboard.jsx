@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import { 
-  PlayIcon, 
-  StopIcon, 
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  Cog6ToothIcon,
-  VideoCameraIcon,
-  ClockIcon,
-  SignalIcon,
-  SignalSlashIcon
-} from '@heroicons/react/24/outline'
+  Play as PlayIcon, 
+  Square as StopIcon, 
+  RefreshCw as ArrowPathIcon,
+  AlertTriangle as ExclamationTriangleIcon,
+  CheckCircle as CheckCircleIcon,
+  XCircle as XCircleIcon,
+  Settings as Cog6ToothIcon,
+  Video as VideoCameraIcon,
+  Clock as ClockIcon,
+  Activity as SignalIcon,
+  WifiOff as SignalSlashIcon
+} from 'lucide-react'
 
 /**
  * RecordingDashboard - Panel de control de grabaciones resilientes
