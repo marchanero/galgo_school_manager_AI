@@ -15,8 +15,10 @@ import sensorRoutes from './routes/sensors.js'
 import replicationRoutes from './routes/replication.js'
 import emqxRoutes from './routes/emqx.js'
 import storageRoutes from './routes/storage.js'
+import recordingsRoutes from './routes/recordings.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
+import recordingManager from './services/recordingManager.js'
 import mqttService from './services/mqttService.js'
 import replicationService from './services/replicationService.js'
 import storageManager from './services/storageManager.js'
@@ -98,6 +100,39 @@ mediaServerManager.start().then(() => {
 
 // Inicializar Storage Manager para gestión de almacenamiento
 storageManager.start()
+
+// Escuchar eventos de RecordingManager
+recordingManager.on('recordingStarted', (data) => {
+  console.log(`📹 Grabación iniciada: ${data.cameraName}`)
+  mqttService.publish('camera_rtsp/recordings/started', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando inicio grabación:', err))
+})
+
+recordingManager.on('recordingStopped', (data) => {
+  console.log(`⏹️ Grabación detenida: ${data.cameraName}`)
+  mqttService.publish('camera_rtsp/recordings/stopped', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando parada grabación:', err))
+})
+
+recordingManager.on('recordingFailed', (data) => {
+  console.log(`❌ Grabación falló: ${data.cameraName} - ${data.reason}`)
+  mqttService.publish('camera_rtsp/recordings/failed', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando fallo grabación:', err))
+})
+
+recordingManager.on('recordingAbandoned', (data) => {
+  console.log(`🚫 Grabación abandonada: ${data.cameraName} tras ${data.totalAttempts} intentos`)
+  mqttService.publish('camera_rtsp/recordings/abandoned', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando abandono grabación:', err))
+})
 
 // Escuchar eventos de almacenamiento
 storageManager.on('alertLevelChanged', ({ previousLevel, currentLevel, diskInfo }) => {
@@ -277,6 +312,7 @@ app.use('/api/sensors', sensorRoutes)
 app.use('/api/replication', replicationRoutes)
 app.use('/api/emqx', emqxRoutes)
 app.use('/api/storage', storageRoutes)
+app.use('/api/recordings', recordingsRoutes)
 
 // Ruta de health check
 app.get('/health', (req, res) => {
@@ -322,6 +358,7 @@ const gracefulShutdown = async (signal) => {
     // 3. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
     console.log('💾 Guardando grabaciones en curso...')
     await mediaServerManager.gracefulStop()
+    await recordingManager.gracefulStop()
     
     // 4. Cerrar servidor Node Media
     console.log('🎬 Deteniendo servidor de medios...')

@@ -176,6 +176,61 @@ export const api = {
     })
     if (!response.ok) throw new Error('Error al eliminar grabaciones de la cámara')
     return response.json()
+  },
+
+  // Grabaciones Resilientes
+  async getRecordingsStatus() {
+    const response = await fetch(`${API_BASE_URL}/recordings/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de grabaciones')
+    return response.json()
+  },
+
+  async getRecordingStats(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/stats`)
+    if (!response.ok) throw new Error('Error al obtener estadísticas')
+    return response.json()
+  },
+
+  async startRecording(data) {
+    const response = await fetch(`${API_BASE_URL}/recordings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al iniciar grabación')
+    return response.json()
+  },
+
+  async stopRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/stop`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabación')
+    return response.json()
+  },
+
+  async stopAllRecordings() {
+    const response = await fetch(`${API_BASE_URL}/recordings/stop-all`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabaciones')
+    return response.json()
+  },
+
+  async updateRecordingsConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/recordings/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async isRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/is-recording`)
+    if (!response.ok) throw new Error('Error al verificar grabación')
+    return response.json()
   }
 }
 
