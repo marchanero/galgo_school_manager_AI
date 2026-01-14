@@ -395,7 +395,7 @@ function AppContent() {
             <div className="mt-8">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center">
-                  <Circle className="w-4 h-4 text-white" />
+                  <Video className="w-4 h-4 text-white" />
                 </div>
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Estado de Grabaciones</h2>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
