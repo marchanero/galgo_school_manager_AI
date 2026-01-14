@@ -122,6 +122,93 @@ export function RecordingProvider({ children }) {
   }, []) // Solo al montar
 
   /**
+   * Re-sincroniza el estado cuando la página vuelve a ser visible
+   * Esto maneja el caso de cerrar y reabrir pestaña/navegador sin recargar
+   */
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ Página visible, re-sincronizando estado...')
+        
+        try {
+          const response = await fetch('/api/media/status')
+          const backendStatus = await response.json()
+          
+          // Crear mapa de detalles de grabación desde el backend
+          const recordingDetailsMap = new Map()
+          if (backendStatus.recordingDetails) {
+            for (const detail of backendStatus.recordingDetails) {
+              recordingDetailsMap.set(detail.cameraId, detail)
+            }
+          }
+          
+          const activeBackendRecordings = new Set(
+            (backendStatus.recording || []).map(key => {
+              const match = key.match(/camera_(\d+)/)
+              return match ? parseInt(match[1]) : null
+            }).filter(id => id !== null)
+          )
+          
+          console.log('🔄 Grabaciones activas detectadas:', Array.from(activeBackendRecordings))
+          
+          setRecordings(prev => {
+            const updated = new Map()
+            
+            // Mantener solo las grabaciones activas en backend
+            for (const [cameraId, recordingInfo] of prev.entries()) {
+              if (activeBackendRecordings.has(cameraId)) {
+                const detail = recordingDetailsMap.get(cameraId)
+                updated.set(cameraId, {
+                  ...recordingInfo,
+                  status: 'recording',
+                  startedAt: detail?.startTime ? new Date(detail.startTime) : recordingInfo.startedAt,
+                  elapsedSeconds: detail?.elapsedSeconds || 0,
+                  scenarioName: detail?.scenarioName || recordingInfo.scenarioName
+                })
+              }
+            }
+            
+            // Agregar grabaciones del backend que no tenemos
+            for (const cameraId of activeBackendRecordings) {
+              if (!updated.has(cameraId)) {
+                const detail = recordingDetailsMap.get(cameraId)
+                updated.set(cameraId, {
+                  status: 'recording',
+                  cameraName: `Cámara ${cameraId}`,
+                  startedAt: detail?.startTime ? new Date(detail.startTime) : new Date(),
+                  elapsedSeconds: detail?.elapsedSeconds || 0,
+                  scenarioName: detail?.scenarioName
+                })
+              }
+            }
+            
+            return updated
+          })
+          
+        } catch (error) {
+          console.error('❌ Error re-sincronizando:', error)
+        }
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // También escuchar pageshow para cuando se restaura desde bfcache
+    const handlePageShow = (event) => {
+      if (event.persisted) {
+        console.log('📄 Página restaurada desde caché, re-sincronizando...')
+        handleVisibilityChange()
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [])
+
+  /**
    * Sincroniza el estado de grabación desde el backend
    * IMPORTANTE: Esta función NO limpia el estado si backend dice false
    * Solo actualiza si backend confirma que SÍ está grabando
