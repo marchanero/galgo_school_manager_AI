@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
-import { 
-  PhotoIcon, 
-  FilmIcon, 
-  ScissorsIcon,
-  ArrowPathIcon,
-  PlayIcon,
-  StopIcon,
-  TrashIcon,
-  Cog6ToothIcon,
-  FolderOpenIcon,
-  ClockIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ExclamationCircleIcon
-} from '@heroicons/react/24/outline'
+import {
+  Image,
+  Film,
+  Scissors,
+  RefreshCw,
+  Play,
+  Square,
+  Trash2,
+  Settings,
+  FolderOpen,
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle
+} from 'lucide-react'
 
 /**
  * VideoProcessing - Panel de post-procesamiento de video
@@ -158,7 +158,7 @@ export default function VideoProcessing() {
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <ArrowPathIcon className="h-8 w-8 animate-spin text-blue-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     )
   }
@@ -169,7 +169,7 @@ export default function VideoProcessing() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <FilmIcon className="h-7 w-7" />
+            <Film className="h-7 w-7" />
             Post-procesamiento de Video
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -186,7 +186,7 @@ export default function VideoProcessing() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Configuración"
           >
-            <Cog6ToothIcon className="h-6 w-6" />
+            <Settings className="h-6 w-6" />
           </button>
           
           <button
@@ -194,7 +194,7 @@ export default function VideoProcessing() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Actualizar"
           >
-            <ArrowPathIcon className="h-6 w-6" />
+            <RefreshCw className="h-6 w-6" />
           </button>
         </div>
       </div>
@@ -203,7 +203,7 @@ export default function VideoProcessing() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-            <PhotoIcon className="h-5 w-5" />
+            <Image className="h-5 w-5" />
             <span className="text-sm font-medium">Thumbnails</span>
           </div>
           <p className="text-2xl font-bold text-blue-800 dark:text-blue-200 mt-1">
@@ -213,7 +213,7 @@ export default function VideoProcessing() {
         
         <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-            <ScissorsIcon className="h-5 w-5" />
+            <Scissors className="h-5 w-5" />
             <span className="text-sm font-medium">Clips</span>
           </div>
           <p className="text-2xl font-bold text-green-800 dark:text-green-200 mt-1">
@@ -223,7 +223,7 @@ export default function VideoProcessing() {
         
         <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-            <FolderOpenIcon className="h-5 w-5" />
+            <FolderOpen className="h-5 w-5" />
             <span className="text-sm font-medium">Comprimidos</span>
           </div>
           <p className="text-2xl font-bold text-purple-800 dark:text-purple-200 mt-1">
@@ -233,7 +233,7 @@ export default function VideoProcessing() {
         
         <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400">
-            <ClockIcon className="h-5 w-5" />
+            <Clock className="h-5 w-5" />
             <span className="text-sm font-medium">En cola</span>
           </div>
           <p className="text-2xl font-bold text-orange-800 dark:text-orange-200 mt-1">
@@ -253,7 +253,7 @@ export default function VideoProcessing() {
             {queueStatus.currentTask && (
               <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
                 <div className="flex items-center gap-2">
-                  <ArrowPathIcon className="h-5 w-5 animate-spin text-blue-500" />
+                  <RefreshCw className="h-5 w-5 animate-spin text-blue-500" />
                   <span className="font-medium text-blue-800 dark:text-blue-200">
                     {queueStatus.currentTask.type}
                   </span>
@@ -270,7 +270,7 @@ export default function VideoProcessing() {
                 className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded"
               >
                 <div className="flex items-center gap-2">
-                  <ClockIcon className="h-5 w-5 text-gray-400" />
+                  <Clock className="h-5 w-5 text-gray-400" />
                   <span className="font-medium text-gray-700 dark:text-gray-300">
                     {task.type}
                   </span>
@@ -279,7 +279,7 @@ export default function VideoProcessing() {
                   onClick={() => cancelTask(task.id)}
                   className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}
@@ -291,9 +291,9 @@ export default function VideoProcessing() {
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-4">
           {[
-            { id: 'thumbnails', label: 'Thumbnails', icon: PhotoIcon },
-            { id: 'clips', label: 'Clips', icon: ScissorsIcon },
-            { id: 'compress', label: 'Compresión', icon: FolderOpenIcon }
+            { id: 'thumbnails', label: 'Thumbnails', icon: Image },
+            { id: 'clips', label: 'Clips', icon: Scissors },
+            { id: 'compress', label: 'Compresión', icon: FolderOpen }
           ].map((tab) => {
             const Icon = tab.icon
             return (
@@ -327,7 +327,7 @@ export default function VideoProcessing() {
                 onClick={generateBatchThumbnails}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2"
               >
-                <PhotoIcon className="h-5 w-5" />
+                <Image className="h-5 w-5" />
                 Generar para todos los videos
               </button>
             </div>
@@ -423,7 +423,7 @@ export default function VideoProcessing() {
                   onClick={extractClip}
                   className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2"
                 >
-                  <ScissorsIcon className="h-5 w-5" />
+                  <Scissors className="h-5 w-5" />
                   Extraer Clip
                 </button>
               </div>
@@ -459,7 +459,7 @@ export default function VideoProcessing() {
                           rel="noopener noreferrer"
                           className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
                         >
-                          <PlayIcon className="h-5 w-5" />
+                          <Play className="h-5 w-5" />
                         </a>
                       </div>
                     ))}
@@ -512,7 +512,7 @@ export default function VideoProcessing() {
                       : 'bg-orange-500 hover:bg-orange-600 text-white'
                   }`}
                 >
-                  <FolderOpenIcon className="h-5 w-5" />
+                  <FolderOpen className="h-5 w-5" />
                   {compressForm.dryRun ? 'Buscar videos' : 'Comprimir videos'}
                 </button>
               </div>

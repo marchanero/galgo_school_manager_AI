@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
-import { 
-  PlayIcon, 
-  StopIcon, 
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  Cog6ToothIcon,
-  VideoCameraIcon,
-  ClockIcon,
-  SignalIcon,
-  SignalSlashIcon
-} from '@heroicons/react/24/outline'
+import {
+  Play,
+  Square,
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Settings,
+  Video,
+  Clock,
+  Wifi,
+  WifiOff
+} from 'lucide-react'
 
 /**
  * RecordingDashboard - Panel de control de grabaciones resilientes
@@ -118,16 +118,16 @@ export default function RecordingDashboard() {
   const getActivityStatus = (lastActivity) => {
     const secondsAgo = Math.floor((Date.now() - lastActivity) / 1000)
     
-    if (secondsAgo < 5) return { text: 'En vivo', color: 'text-green-500', icon: SignalIcon }
-    if (secondsAgo < 30) return { text: `Hace ${secondsAgo}s`, color: 'text-green-400', icon: SignalIcon }
-    if (secondsAgo < 60) return { text: `Hace ${secondsAgo}s`, color: 'text-yellow-500', icon: SignalIcon }
-    return { text: `Hace ${Math.floor(secondsAgo / 60)}m`, color: 'text-red-500', icon: SignalSlashIcon }
+    if (secondsAgo < 5) return { text: 'En vivo', color: 'text-green-500', icon: Wifi }
+    if (secondsAgo < 30) return { text: `Hace ${secondsAgo}s`, color: 'text-green-400', icon: Wifi }
+    if (secondsAgo < 60) return { text: `Hace ${secondsAgo}s`, color: 'text-yellow-500', icon: Wifi }
+    return { text: `Hace ${Math.floor(secondsAgo / 60)}m`, color: 'text-red-500', icon: WifiOff }
   }
 
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <ArrowPathIcon className="h-8 w-8 animate-spin text-blue-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     )
   }
@@ -138,7 +138,7 @@ export default function RecordingDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <VideoCameraIcon className="h-7 w-7" />
+            <Video className="h-7 w-7" />
             Grabaciones Resilientes
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -155,7 +155,7 @@ export default function RecordingDashboard() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Configuración"
           >
-            <Cog6ToothIcon className="h-6 w-6" />
+            <Settings className="h-6 w-6" />
           </button>
           
           {recordings.length > 0 && (
@@ -163,7 +163,7 @@ export default function RecordingDashboard() {
               onClick={stopAll}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
             >
-              <StopIcon className="h-5 w-5" />
+              <Square className="h-5 w-5" />
               Detener Todas
             </button>
           )}
@@ -173,7 +173,7 @@ export default function RecordingDashboard() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Actualizar"
           >
-            <ArrowPathIcon className="h-6 w-6" />
+            <RefreshCw className="h-6 w-6" />
           </button>
         </div>
       </div>
@@ -181,7 +181,7 @@ export default function RecordingDashboard() {
       {/* Estado de reconexión */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <ArrowPathIcon className="h-6 w-6 text-blue-500" />
+          <RefreshCw className="h-6 w-6 text-blue-500" />
           <div>
             <p className="font-medium text-blue-800 dark:text-blue-200">
               Reconexión Automática: {config.autoReconnect ? 'Habilitada' : 'Deshabilitada'}
@@ -202,7 +202,7 @@ export default function RecordingDashboard() {
         
         {recordings.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <VideoCameraIcon className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+            <Video className="h-12 w-12 mx-auto text-gray-400 mb-2" />
             <p className="text-gray-500 dark:text-gray-400">No hay grabaciones activas</p>
           </div>
         ) : (
@@ -224,9 +224,9 @@ export default function RecordingDashboard() {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       {recording.isHealthy ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                        <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
-                        <XCircleIcon className="h-5 w-5 text-red-500" />
+                        <XCircle className="h-5 w-5 text-red-500" />
                       )}
                       <span className="font-medium text-gray-900 dark:text-white">
                         {recording.cameraName}
@@ -238,7 +238,7 @@ export default function RecordingDashboard() {
                       className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                       title="Detener grabación"
                     >
-                      <StopIcon className="h-5 w-5" />
+                      <Square className="h-5 w-5" />
                     </button>
                   </div>
                   
@@ -254,7 +254,7 @@ export default function RecordingDashboard() {
                     {/* Duración */}
                     <div className="flex items-center justify-between text-gray-600 dark:text-gray-400">
                       <span className="flex items-center gap-1">
-                        <ClockIcon className="h-4 w-4" />
+                        <Clock className="h-4 w-4" />
                         Duración
                       </span>
                       <span>{formatDuration(recording.duration)}</span>

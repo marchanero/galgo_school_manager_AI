@@ -1,18 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
 import { 
-  CpuChipIcon, 
-  ServerIcon,
-  BoltIcon,
-  ArrowPathIcon,
-  ChartBarIcon,
-  Cog6ToothIcon,
-  PlayIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  SignalIcon,
-  ClockIcon
-} from '@heroicons/react/24/outline'
+  Cpu, 
+  Server,
+  Zap,
+  RefreshCw,
+  BarChart3,
+  Settings,
+  Play,
+  CheckCircle,
+  XCircle,
+  Wifi,
+  Clock
+} from 'lucide-react'
 
 /**
  * PerformanceDashboard - Panel de monitoreo y optimización de rendimiento
@@ -112,7 +112,7 @@ export default function PerformanceDashboard() {
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <ArrowPathIcon className="h-8 w-8 animate-spin text-blue-500" />
+        <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     )
   }
@@ -125,7 +125,7 @@ export default function PerformanceDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <BoltIcon className="h-7 w-7" />
+            <Zap className="h-7 w-7" />
             Rendimiento del Sistema
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -142,7 +142,7 @@ export default function PerformanceDashboard() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Configuración"
           >
-            <Cog6ToothIcon className="h-6 w-6" />
+            <Settings className="h-6 w-6" />
           </button>
           
           <button
@@ -150,7 +150,7 @@ export default function PerformanceDashboard() {
             className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             title="Actualizar"
           >
-            <ArrowPathIcon className="h-6 w-6" />
+            <RefreshCw className="h-6 w-6" />
           </button>
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function PerformanceDashboard() {
           'bg-green-50 dark:bg-green-900/20'
         }`}>
           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <CpuChipIcon className="h-5 w-5" />
+            <Cpu className="h-5 w-5" />
             <span className="text-sm font-medium">CPU</span>
           </div>
           <p className={`text-2xl font-bold mt-1 ${
@@ -183,7 +183,7 @@ export default function PerformanceDashboard() {
           'bg-blue-50 dark:bg-blue-900/20'
         }`}>
           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-            <ServerIcon className="h-5 w-5" />
+            <Server className="h-5 w-5" />
             <span className="text-sm font-medium">Memoria</span>
           </div>
           <p className={`text-2xl font-bold mt-1 ${
@@ -198,7 +198,7 @@ export default function PerformanceDashboard() {
         {/* Cache Hit Rate */}
         <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
-            <SignalIcon className="h-5 w-5" />
+            <Wifi className="h-5 w-5" />
             <span className="text-sm font-medium">Cache Hit</span>
           </div>
           <p className="text-2xl font-bold text-purple-800 dark:text-purple-200 mt-1">
@@ -209,7 +209,7 @@ export default function PerformanceDashboard() {
         {/* Perfil activo */}
         <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4">
           <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
-            <ChartBarIcon className="h-5 w-5" />
+            <BarChart3 className="h-5 w-5" />
             <span className="text-sm font-medium">Perfil</span>
           </div>
           <p className="text-2xl font-bold text-indigo-800 dark:text-indigo-200 mt-1 capitalize">
@@ -228,7 +228,7 @@ export default function PerformanceDashboard() {
             onClick={detectHardware}
             className="text-sm text-blue-500 hover:text-blue-600 flex items-center gap-1"
           >
-            <ArrowPathIcon className="h-4 w-4" />
+            <RefreshCw className="h-4 w-4" />
             Re-detectar
           </button>
         </div>
@@ -371,12 +371,12 @@ export default function PerformanceDashboard() {
             >
               {isBenchmarking ? (
                 <>
-                  <ArrowPathIcon className="h-5 w-5 animate-spin" />
+                  <RefreshCw className="h-5 w-5 animate-spin" />
                   Ejecutando benchmark...
                 </>
               ) : (
                 <>
-                  <PlayIcon className="h-5 w-5" />
+                  <Play className="h-5 w-5" />
                   Ejecutar Benchmark
                 </>
               )}
@@ -406,9 +406,9 @@ export default function PerformanceDashboard() {
               >
                 <div className="flex items-center gap-2 mb-2">
                   {result.success ? (
-                    <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                    <CheckCircle className="h-5 w-5 text-green-500" />
                   ) : (
-                    <XCircleIcon className="h-5 w-5 text-red-500" />
+                    <XCircle className="h-5 w-5 text-red-500" />
                   )}
                   <span className="font-mono text-sm text-gray-900 dark:text-white">
                     {result.encoder}
