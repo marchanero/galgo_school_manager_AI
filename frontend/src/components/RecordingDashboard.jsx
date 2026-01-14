@@ -13,7 +13,14 @@ import {
   Video,
   Clock,
   Wifi,
-  WifiOff
+  WifiOff,
+  Film,
+  Calendar,
+  HardDrive,
+  Trash2,
+  Download,
+  Image,
+  FolderOpen
 } from 'lucide-react'
 
 /**
@@ -23,11 +30,15 @@ import {
  */
 export default function RecordingDashboard() {
   const [recordings, setRecordings] = useState([])
+  const [savedRecordings, setSavedRecordings] = useState([])
   const [config, setConfig] = useState({})
   const [cameras, setCameras] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [showConfig, setShowConfig] = useState(false)
   const [editConfig, setEditConfig] = useState({})
+  const [activeTab, setActiveTab] = useState('active') // 'active' | 'saved'
+  const [filterScenario, setFilterScenario] = useState('')
+  const [filterCamera, setFilterCamera] = useState('')
   // Estado para confirmación de detener grabación
   const [confirmStop, setConfirmStop] = useState({ isOpen: false, cameraId: null, cameraName: '' })
   const [confirmStopAll, setConfirmStopAll] = useState(false)
@@ -35,14 +46,18 @@ export default function RecordingDashboard() {
   // Cargar datos - combina grabaciones de recordingManager y mediaServer
   const loadData = useCallback(async () => {
     try {
-      const [statusRes, mediaRes, camerasRes] = await Promise.all([
+      const [statusRes, mediaRes, camerasRes, storageRes] = await Promise.all([
         api.getRecordingsStatus().catch(() => ({ data: { recordings: [], config: {} } })),
         api.getMediaStatus().catch(() => ({ recording: [], recordingDetails: [] })),
-        api.getCameras()
+        api.getCameras(),
+        api.getStorageRecordings().catch(() => ({ data: { recordings: [] } }))
       ])
       
       // Grabaciones del recordingManager
       const recordingManagerRecs = statusRes.data?.recordings || []
+      
+      // Grabaciones guardadas
+      setSavedRecordings(storageRes.data?.recordings || [])
       
       // Grabaciones del mediaServer (convertir al mismo formato)
       const mediaServerRecs = (mediaRes.recordingDetails || []).map(detail => ({
@@ -180,6 +195,45 @@ export default function RecordingDashboard() {
     return { text: `Hace ${Math.floor(secondsAgo / 60)}m`, color: 'text-red-500', icon: WifiOff }
   }
 
+  // Formatear tamaño de archivo
+  const formatBytes = (bytes) => {
+    if (!bytes) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Formatear fecha legible
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // Obtener URL del thumbnail para un video
+  const getThumbnailUrl = (recording) => {
+    // Intentar construir la URL del thumbnail basándose en el nombre del video
+    const videoName = recording.filename?.replace('.mp4', '') || ''
+    return `/api/processing/thumbnails/${videoName}_thumb.jpg`
+  }
+
+  // Filtrar grabaciones guardadas
+  const filteredSavedRecordings = savedRecordings.filter(rec => {
+    if (filterScenario && rec.scenario !== filterScenario) return false
+    if (filterCamera && rec.cameraId !== filterCamera) return false
+    return true
+  })
+
+  // Obtener escenarios únicos para el filtro
+  const uniqueScenarios = [...new Set(savedRecordings.map(r => r.scenario).filter(Boolean))]
+  const uniqueCameras = [...new Set(savedRecordings.map(r => r.cameraId).filter(Boolean))]
+
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
@@ -234,44 +288,77 @@ export default function RecordingDashboard() {
         </div>
       </div>
 
-      {/* Estado de reconexión */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <div className="flex items-center gap-3">
-          <RefreshCw className="h-6 w-6 text-blue-500" />
-          <div>
-            <p className="font-medium text-blue-800 dark:text-blue-200">
-              Reconexión Automática: {config.autoReconnect ? 'Habilitada' : 'Deshabilitada'}
-            </p>
-            <p className="text-sm text-blue-600 dark:text-blue-400">
-              Máximo {config.maxReconnectAttempts || 10} intentos • 
-              Verificación cada {(config.healthCheckInterval || 30000) / 1000}s
-            </p>
+      {/* Pestañas */}
+      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'active'
+              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Video className="h-4 w-4" />
+            Activas ({recordings.length})
           </div>
-        </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('saved')}
+          className={`px-4 py-2 font-medium border-b-2 transition-colors ${
+            activeTab === 'saved'
+              ? 'border-green-500 text-green-600 dark:text-green-400'
+              : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Guardadas ({savedRecordings.length})
+          </div>
+        </button>
       </div>
 
-      {/* Grabaciones activas */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Grabaciones Activas ({recordings.length})
-        </h3>
-        
-        {recordings.length === 0 ? (
-          <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
-            <Video className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-            <p className="text-gray-500 dark:text-gray-400">No hay grabaciones activas</p>
+      {/* Estado de reconexión */}
+      {activeTab === 'active' && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <RefreshCw className="h-6 w-6 text-blue-500" />
+            <div>
+              <p className="font-medium text-blue-800 dark:text-blue-200">
+                Reconexión Automática: {config.autoReconnect ? 'Habilitada' : 'Deshabilitada'}
+              </p>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                Máximo {config.maxReconnectAttempts || 10} intentos • 
+                Verificación cada {(config.healthCheckInterval || 30000) / 1000}s
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {recordings.map((recording) => {
-              const activity = getActivityStatus(recording.lastActivity)
-              const ActivityIcon = activity.icon
-              
-              return (
-                <div
-                  key={recording.cameraId}
-                  className={`bg-white dark:bg-gray-800 rounded-lg border p-4 ${
-                    recording.isHealthy 
+        </div>
+      )}
+
+      {/* Grabaciones activas */}
+      {activeTab === 'active' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Grabaciones Activas ({recordings.length})
+          </h3>
+          
+          {recordings.length === 0 ? (
+            <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <Video className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+              <p className="text-gray-500 dark:text-gray-400">No hay grabaciones activas</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recordings.map((recording) => {
+                const activity = getActivityStatus(recording.lastActivity)
+                const ActivityIcon = activity.icon
+                
+                return (
+                  <div
+                    key={recording.cameraId}
+                    className={`bg-white dark:bg-gray-800 rounded-lg border p-4 ${
+                      recording.isHealthy 
                       ? 'border-green-200 dark:border-green-800' 
                       : 'border-red-200 dark:border-red-800'
                   }`}
@@ -335,7 +422,7 @@ export default function RecordingDashboard() {
                     {recording.reconnectAttempts > 0 && (
                       <div className="flex items-center justify-between text-yellow-600 dark:text-yellow-400">
                         <span className="flex items-center gap-1">
-                          <ExclamationTriangleIcon className="h-4 w-4" />
+                          <AlertTriangle className="h-4 w-4" />
                           Reconexiones
                         </span>
                         <span>{recording.reconnectAttempts}</span>
@@ -361,56 +448,184 @@ export default function RecordingDashboard() {
             })}
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Cámaras disponibles */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Cámaras Disponibles
-        </h3>
-        
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-          {cameras.map((camera) => {
-            const isRecording = recordings.some(r => r.cameraId === camera.id)
-            
-            return (
-              <div
-                key={camera.id}
-                className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
-              >
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {camera.name}
-                  </p>
-                  <p className={`text-xs ${camera.isActive ? 'text-green-500' : 'text-gray-400'}`}>
-                    {camera.isActive ? 'Activa' : 'Inactiva'}
-                  </p>
-                </div>
-                
-                {isRecording ? (
-                  <div className="flex items-center gap-1 text-red-500">
-                    <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    <span className="text-xs">REC</span>
+      {activeTab === 'active' && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Cámaras Disponibles
+          </h3>
+          
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {cameras.map((camera) => {
+              const isRecording = recordings.some(r => r.cameraId === camera.id)
+              
+              return (
+                <div
+                  key={camera.id}
+                  className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900 dark:text-white">
+                      {camera.name}
+                    </p>
+                    <p className={`text-xs ${camera.isActive ? 'text-green-500' : 'text-gray-400'}`}>
+                      {camera.isActive ? 'Activa' : 'Inactiva'}
+                    </p>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => startRecording(camera)}
-                    disabled={!camera.isActive}
-                    className={`p-2 rounded ${
-                      camera.isActive
-                        ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
-                        : 'text-gray-400 cursor-not-allowed'
-                    }`}
-                    title={camera.isActive ? 'Iniciar grabación' : 'Cámara inactiva'}
-                  >
-                    <PlayIcon className="h-5 w-5" />
-                  </button>
-                )}
-              </div>
-            )
-          })}
+                  
+                  {isRecording ? (
+                    <div className="flex items-center gap-1 text-red-500">
+                      <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-xs">REC</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => startRecording(camera)}
+                      disabled={!camera.isActive}
+                      className={`p-2 rounded ${
+                        camera.isActive
+                          ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                          : 'text-gray-400 cursor-not-allowed'
+                      }`}
+                      title={camera.isActive ? 'Iniciar grabación' : 'Cámara inactiva'}
+                    >
+                      <Play className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Grabaciones guardadas */}
+      {activeTab === 'saved' && (
+        <div className="space-y-4">
+          {/* Filtros */}
+          <div className="flex flex-wrap gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-gray-400" />
+              <select
+                value={filterScenario}
+                onChange={(e) => setFilterScenario(e.target.value)}
+                className="px-3 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+              >
+                <option value="">Todos los escenarios</option>
+                {uniqueScenarios.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Video className="h-5 w-5 text-gray-400" />
+              <select
+                value={filterCamera}
+                onChange={(e) => setFilterCamera(e.target.value)}
+                className="px-3 py-1.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+              >
+                <option value="">Todas las cámaras</option>
+                {uniqueCameras.map(c => (
+                  <option key={c} value={c}>Cámara {c}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="ml-auto text-sm text-gray-500 dark:text-gray-400">
+              {filteredSavedRecordings.length} grabaciones
+            </div>
+          </div>
+
+          {/* Lista de grabaciones */}
+          {filteredSavedRecordings.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <Film className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+              <p className="text-gray-500 dark:text-gray-400 text-lg">No hay grabaciones guardadas</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
+                Las grabaciones aparecerán aquí cuando se detengan
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredSavedRecordings.map((recording, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-video bg-gray-100 dark:bg-gray-900">
+                    <img
+                      src={getThumbnailUrl(recording)}
+                      alt={recording.filename}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none'
+                        e.target.nextSibling.style.display = 'flex'
+                      }}
+                    />
+                    <div className="hidden absolute inset-0 items-center justify-center bg-gray-200 dark:bg-gray-700">
+                      <Image className="h-12 w-12 text-gray-400" />
+                    </div>
+                    {/* Duración */}
+                    {recording.duration && (
+                      <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 text-white text-xs rounded">
+                        {formatDuration(recording.duration * 1000)}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Info */}
+                  <div className="p-3">
+                    <h4 className="font-medium text-gray-900 dark:text-white text-sm truncate" title={recording.filename}>
+                      {recording.filename}
+                    </h4>
+                    
+                    <div className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5" />
+                        <span>{formatDate(recording.created)}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1">
+                        <HardDrive className="h-3.5 w-3.5" />
+                        <span>{recording.sizeFormatted || formatBytes(recording.size)}</span>
+                      </div>
+                      
+                      {recording.scenario && (
+                        <div className="flex items-center gap-1">
+                          <FolderOpen className="h-3.5 w-3.5" />
+                          <span className="truncate">{recording.scenario}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Acciones */}
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                      <a
+                        href={`/api/media/download/${recording.cameraId}/${recording.filename}`}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        Descargar
+                      </a>
+                      <button
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Modal de configuración */}
       {showConfig && (

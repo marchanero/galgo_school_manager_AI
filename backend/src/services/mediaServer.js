@@ -449,7 +449,6 @@ class MediaServerManager {
       console.error(`❌ Error generando thumbnail para camera_${cameraId}:`, error.message)
     }
   }
-  }
 
   /**
    * Detiene stream HLS de una cámara específica
