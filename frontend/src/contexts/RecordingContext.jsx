@@ -50,6 +50,14 @@ export function RecordingProvider({ children }) {
         
         console.log('📊 Estado del backend:', backendStatus)
         
+        // Crear mapa de detalles de grabación desde el backend
+        const recordingDetailsMap = new Map()
+        if (backendStatus.recordingDetails) {
+          for (const detail of backendStatus.recordingDetails) {
+            recordingDetailsMap.set(detail.cameraId, detail)
+          }
+        }
+        
         // Las grabaciones activas en el backend (ej: ['camera_1', 'camera_2'])
         const activeBackendRecordings = new Set(
           (backendStatus.recording || []).map(key => {
@@ -68,11 +76,16 @@ export function RecordingProvider({ children }) {
           // Mantener solo las grabaciones que el backend confirma como activas
           for (const [cameraId, recordingInfo] of prev.entries()) {
             if (activeBackendRecordings.has(cameraId)) {
+              const detail = recordingDetailsMap.get(cameraId)
               updated.set(cameraId, {
                 ...recordingInfo,
-                status: 'recording'
+                status: 'recording',
+                // Sincronizar tiempo de inicio desde el backend
+                startedAt: detail?.startTime ? new Date(detail.startTime) : recordingInfo.startedAt,
+                elapsedSeconds: detail?.elapsedSeconds || 0,
+                scenarioName: detail?.scenarioName || recordingInfo.scenarioName
               })
-              console.log(`✅ Grabación ${cameraId} confirmada activa`)
+              console.log(`✅ Grabación ${cameraId} confirmada activa (${detail?.elapsedSeconds || 0}s)`)
             } else {
               console.log(`🗑️ Grabación ${cameraId} ya no está activa, removiendo del estado`)
             }
@@ -81,11 +94,14 @@ export function RecordingProvider({ children }) {
           // Si hay grabaciones en backend que no tenemos en el estado local, agregarlas
           for (const cameraId of activeBackendRecordings) {
             if (!updated.has(cameraId)) {
-              console.log(`➕ Agregando grabación ${cameraId} que estaba activa en backend`)
+              const detail = recordingDetailsMap.get(cameraId)
+              console.log(`➕ Agregando grabación ${cameraId} que estaba activa en backend (${detail?.elapsedSeconds || 0}s)`)
               updated.set(cameraId, {
                 status: 'recording',
                 cameraName: `Cámara ${cameraId}`, // Nombre por defecto
-                startedAt: new Date() // Aproximado
+                startedAt: detail?.startTime ? new Date(detail.startTime) : new Date(),
+                elapsedSeconds: detail?.elapsedSeconds || 0,
+                scenarioName: detail?.scenarioName
               })
             }
           }
@@ -351,6 +367,43 @@ export function RecordingProvider({ children }) {
     }
   }, [])
 
+  /**
+   * Obtiene el tiempo transcurrido más largo de todas las grabaciones activas
+   * Útil para mostrar el temporizador principal
+   */
+  const getMaxElapsedSeconds = useCallback(() => {
+    let maxElapsed = 0
+    for (const [, recordingInfo] of recordings.entries()) {
+      if (recordingInfo.startedAt) {
+        const elapsed = Math.floor((Date.now() - new Date(recordingInfo.startedAt).getTime()) / 1000)
+        if (elapsed > maxElapsed) {
+          maxElapsed = elapsed
+        }
+      }
+      // También considerar elapsedSeconds sincronizado del backend
+      if (recordingInfo.elapsedSeconds && recordingInfo.elapsedSeconds > maxElapsed) {
+        maxElapsed = recordingInfo.elapsedSeconds
+      }
+    }
+    return maxElapsed
+  }, [recordings])
+
+  /**
+   * Obtiene la primera fecha de inicio de grabación (la más antigua)
+   */
+  const getOldestStartTime = useCallback(() => {
+    let oldest = null
+    for (const [, recordingInfo] of recordings.entries()) {
+      if (recordingInfo.startedAt) {
+        const startTime = new Date(recordingInfo.startedAt)
+        if (!oldest || startTime < oldest) {
+          oldest = startTime
+        }
+      }
+    }
+    return oldest
+  }, [recordings])
+
   const value = {
     // Estado
     recordings,
@@ -375,9 +428,11 @@ export function RecordingProvider({ children }) {
     downloadRecording,
     deleteRecording,
     
-    // Estadísticas
+    // Estadísticas y tiempo
     activeRecordingsCount: recordings.size,
-    isAnyRecording: recordings.size > 0
+    isAnyRecording: recordings.size > 0,
+    getMaxElapsedSeconds,
+    getOldestStartTime
   }
 
   return (

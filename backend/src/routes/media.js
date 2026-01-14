@@ -164,10 +164,17 @@ router.get('/status/:cameraId', (req, res) => {
   try {
     const { cameraId } = req.params
     const isRecording = mediaServerManager.isRecording(parseInt(cameraId))
+    const recordingInfo = mediaServerManager.getRecordingInfo(parseInt(cameraId))
+    
     res.json({
       cameraId: parseInt(cameraId),
       isRecording,
-      status: isRecording ? 'recording' : 'idle'
+      status: isRecording ? 'recording' : 'idle',
+      ...(recordingInfo && {
+        startTime: recordingInfo.startTime,
+        elapsedSeconds: recordingInfo.elapsedSeconds,
+        scenarioName: recordingInfo.scenarioName
+      })
     })
   } catch (error) {
     res.status(500).json({ error: error.message })

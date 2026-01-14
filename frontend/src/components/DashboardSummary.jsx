@@ -75,7 +75,10 @@ const DashboardSummary = () => {
     activeRecordingsCount,
     syncRecordingStatus,
     startAllRecordings,
-    stopAllRecordings
+    stopAllRecordings,
+    getMaxElapsedSeconds,
+    getOldestStartTime,
+    initialSyncDone
   } = useRecording()
   
   const { 
@@ -107,15 +110,33 @@ const DashboardSummary = () => {
     return () => clearInterval(interval)
   }, [recordingState])
 
-  // Sync con recording context
+  // Sync con recording context - incluye sincronización del timer desde backend
   useEffect(() => {
     if (activeRecordingsCount > 0 && recordingState === 'idle') {
       setRecordingState('recording')
+      // Sincronizar tiempo transcurrido desde el backend
+      if (initialSyncDone) {
+        const syncedElapsed = getMaxElapsedSeconds()
+        if (syncedElapsed > 0) {
+          setElapsedTime(syncedElapsed)
+        }
+      }
     } else if (activeRecordingsCount === 0 && recordingState === 'recording') {
       setRecordingState('idle')
       setElapsedTime(0)
     }
-  }, [activeRecordingsCount, recordingState])
+  }, [activeRecordingsCount, recordingState, initialSyncDone])
+
+  // Sincronización inicial del timer cuando se completa el sync con backend
+  useEffect(() => {
+    if (initialSyncDone && activeRecordingsCount > 0 && elapsedTime === 0) {
+      const syncedElapsed = getMaxElapsedSeconds()
+      if (syncedElapsed > 0) {
+        console.log('[DashboardSummary] Sincronizando timer desde backend:', syncedElapsed, 'segundos')
+        setElapsedTime(syncedElapsed)
+      }
+    }
+  }, [initialSyncDone])
 
   // Verificar estado de cámara
   const checkCameraStatus = async (cameraId) => {

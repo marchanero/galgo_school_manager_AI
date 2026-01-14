@@ -484,12 +484,29 @@ class MediaServerManager {
   }
 
   /**
-   * Estado de las cámaras activas
+   * Estado de las cámaras activas con información detallada
    */
   getStatus() {
+    // Información detallada de grabaciones
+    const recordingDetails = []
+    for (const [key, data] of this.recordingProcesses.entries()) {
+      // Extraer camera_X del key (ej: 'camera_1_recording' -> 'camera_1')
+      const cameraKey = key.replace('_recording', '')
+      recordingDetails.push({
+        key: cameraKey,
+        cameraId: data.cameraId,
+        scenarioId: data.scenarioId,
+        scenarioName: data.scenarioName,
+        startTime: data.startTime?.toISOString(),
+        elapsedSeconds: data.startTime ? Math.floor((Date.now() - data.startTime.getTime()) / 1000) : 0,
+        outputDir: data.outputDir
+      })
+    }
+
     return {
       streaming: Array.from(this.rtspProcesses.keys()),
       recording: Array.from(this.recordingProcesses.keys()),
+      recordingDetails,
       mediaServer: this.nms ? 'running' : 'stopped'
     }
   }
@@ -499,6 +516,24 @@ class MediaServerManager {
    */
   isRecording(cameraId) {
     return this.recordingProcesses.has(`camera_${cameraId}`)
+  }
+
+  /**
+   * Obtiene información detallada de una grabación
+   */
+  getRecordingInfo(cameraId) {
+    const recordKey = `camera_${cameraId}_recording`
+    const data = this.recordingProcesses.get(recordKey)
+    if (!data) return null
+    
+    return {
+      cameraId: data.cameraId,
+      scenarioId: data.scenarioId,
+      scenarioName: data.scenarioName,
+      startTime: data.startTime?.toISOString(),
+      elapsedSeconds: data.startTime ? Math.floor((Date.now() - data.startTime.getTime()) / 1000) : 0,
+      outputDir: data.outputDir
+    }
   }
 
   /**
