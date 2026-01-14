@@ -4,6 +4,7 @@ import { useMQTT } from '../contexts/MQTTContext'
 import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
 import CameraThumbnail from './CameraThumbnail'
+import LiveStreamThumbnail from './LiveStreamThumbnail'
 import { toast } from 'react-hot-toast'
 import { 
   Video, 
@@ -27,7 +28,9 @@ import {
   ChevronRight,
   Settings,
   Theater,
-  Maximize2
+  Maximize2,
+  Image,
+  Tv
 } from 'lucide-react'
 
 const DashboardSummary = () => {
@@ -38,6 +41,10 @@ const DashboardSummary = () => {
   const [recordingTab, setRecordingTab] = useState('video')
   const [cameraStatus, setCameraStatus] = useState(new Map())
   const [syncStatus, setSyncStatus] = useState({ isConnected: false, isSyncing: false })
+  // Modo de visualización: 'thumbnail' (snapshots) o 'live' (streaming)
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('dashboardViewMode') || 'thumbnail'
+  })
   const [stats, setStats] = useState({
     totalCameras: 0,
     activeCameras: 0,
@@ -591,6 +598,40 @@ const DashboardSummary = () => {
                 Cámaras en Vivo
               </h3>
               <div className="flex items-center gap-2">
+                {/* Toggle Thumbnail/Live */}
+                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+                  <button
+                    onClick={() => {
+                      setViewMode('thumbnail')
+                      localStorage.setItem('dashboardViewMode', 'thumbnail')
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      viewMode === 'thumbnail' 
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                    title="Vista de snapshots (menos recursos)"
+                  >
+                    <Image className="w-3 h-3" />
+                    <span className="hidden sm:inline">Snapshots</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode('live')
+                      localStorage.setItem('dashboardViewMode', 'live')
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      viewMode === 'live' 
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                    title="Streaming en vivo (más fluido)"
+                  >
+                    <Tv className="w-3 h-3" />
+                    <span className="hidden sm:inline">Live</span>
+                  </button>
+                </div>
+                
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {stats.activeCameras}/{stats.totalCameras} activas
                 </span>
@@ -616,14 +657,18 @@ const DashboardSummary = () => {
                     const status = cameraStatus.get(camera.id) || { active: false }
                     const isRecordingCamera = recordings.has(camera.id)
                     
+                    // Usar LiveStreamThumbnail o CameraThumbnail según el modo
+                    const ThumbnailComponent = viewMode === 'live' ? LiveStreamThumbnail : CameraThumbnail
+                    
                     return (
-                      <CameraThumbnail
+                      <ThumbnailComponent
                         key={camera.id}
                         camera={camera}
                         isActive={status.active}
                         isRecording={isRecordingCamera}
                         selected={selectedCameraId === camera.id}
                         onClick={() => setSelectedCameraId(camera.id)}
+                        quality="low"
                       />
                     )
                   })}
