@@ -14,10 +14,12 @@ import scenarioRoutes from './routes/scenarios.js'
 import sensorRoutes from './routes/sensors.js'
 import replicationRoutes from './routes/replication.js'
 import emqxRoutes from './routes/emqx.js'
+import storageRoutes from './routes/storage.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
 import mqttService from './services/mqttService.js'
 import replicationService from './services/replicationService.js'
+import storageManager from './services/storageManager.js'
 
 dotenv.config()
 
@@ -92,6 +94,37 @@ mediaServerManager.start().then(() => {
   console.log('✅ Sistema de grabación y streaming iniciado')
 }).catch((error) => {
   console.error('❌ Error iniciando Media Server:', error)
+})
+
+// Inicializar Storage Manager para gestión de almacenamiento
+storageManager.start()
+
+// Escuchar eventos de almacenamiento
+storageManager.on('alertLevelChanged', ({ previousLevel, currentLevel, diskInfo }) => {
+  console.log(`⚠️ ALERTA DE DISCO: ${previousLevel} → ${currentLevel}`)
+  console.log(`   Uso: ${diskInfo.usePercent}%, Disponible: ${diskInfo.availableFormatted}`)
+  
+  // Publicar alerta por MQTT
+  mqttService.publish('camera_rtsp/system/storage/alert', {
+    level: currentLevel,
+    previousLevel,
+    diskUsage: diskInfo.usePercent,
+    available: diskInfo.available,
+    availableFormatted: diskInfo.availableFormatted,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando alerta MQTT:', err))
+})
+
+storageManager.on('cleanupCompleted', ({ deletedFiles, freedSpace, freedSpaceFormatted }) => {
+  console.log(`🧹 Limpieza completada: ${deletedFiles} archivos, ${freedSpaceFormatted} liberados`)
+  
+  // Publicar evento por MQTT
+  mqttService.publish('camera_rtsp/system/storage/cleanup', {
+    deletedFiles,
+    freedSpace,
+    freedSpaceFormatted,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando limpieza MQTT:', err))
 })
 
 // Inicializar MQTT Service
@@ -243,6 +276,7 @@ app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/sensors', sensorRoutes)
 app.use('/api/replication', replicationRoutes)
 app.use('/api/emqx', emqxRoutes)
+app.use('/api/storage', storageRoutes)
 
 // Ruta de health check
 app.get('/health', (req, res) => {
@@ -276,20 +310,24 @@ const gracefulShutdown = async (signal) => {
   console.log(`\n🛑 Señal ${signal} recibida. Cerrando servidor...`)
   
   try {
-    // 1. Detener nuevas conexiones
+    // 1. Detener monitoreo de almacenamiento
+    console.log('💾 Deteniendo monitoreo de almacenamiento...')
+    storageManager.stop()
+    
+    // 2. Detener nuevas conexiones
     console.log('📡 Cerrando servicios de streaming...')
     streamingService.closeAll()
     webrtcService.stopAll()
     
-    // 2. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
+    // 3. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
     console.log('💾 Guardando grabaciones en curso...')
     await mediaServerManager.gracefulStop()
     
-    // 3. Cerrar servidor Node Media
+    // 4. Cerrar servidor Node Media
     console.log('🎬 Deteniendo servidor de medios...')
     mediaServerManager.stop()
     
-    // 4. Desconectar base de datos
+    // 5. Desconectar base de datos
     console.log('🗄️ Cerrando conexión a base de datos...')
     await prisma.$disconnect()
     

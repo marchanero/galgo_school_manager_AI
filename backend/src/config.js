@@ -28,8 +28,26 @@ export const replication = {
   sshKeyPath: process.env.REPLICATION_SSH_KEY
 }
 
+// Configuración de almacenamiento y retención
+export const storage = {
+  // Umbrales de alerta (porcentaje de uso del disco)
+  warningThreshold: parseInt(process.env.STORAGE_WARNING_THRESHOLD) || 75,
+  criticalThreshold: parseInt(process.env.STORAGE_CRITICAL_THRESHOLD) || 90,
+  autoCleanThreshold: parseInt(process.env.STORAGE_AUTOCLEAN_THRESHOLD) || 85,
+  
+  // Retención por defecto (días)
+  defaultRetentionDays: parseInt(process.env.STORAGE_RETENTION_DAYS) || 30,
+  
+  // Espacio mínimo libre requerido (GB)
+  minFreeSpaceGB: parseInt(process.env.STORAGE_MIN_FREE_GB) || 10,
+  
+  // Intervalo de verificación (minutos)
+  checkIntervalMinutes: parseInt(process.env.STORAGE_CHECK_INTERVAL_MINUTES) || 5
+}
+
 export default {
   cameraConfig,
   streamPaths,
-  replication
+  replication,
+  storage
 }

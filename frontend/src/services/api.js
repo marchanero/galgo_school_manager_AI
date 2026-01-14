@@ -96,6 +96,86 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/replication/disk-info`)
     if (!response.ok) throw new Error('Error al obtener información del disco local')
     return response.json()
+  },
+
+  // Almacenamiento
+  async getStorageStatus() {
+    const response = await fetch(`${API_BASE_URL}/storage/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageSummary() {
+    const response = await fetch(`${API_BASE_URL}/storage/summary`)
+    if (!response.ok) throw new Error('Error al obtener resumen de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageConfig() {
+    const response = await fetch(`${API_BASE_URL}/storage/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración de almacenamiento')
+    return response.json()
+  },
+
+  async updateStorageConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/storage/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageRecordings(filters = {}) {
+    const params = new URLSearchParams(filters)
+    const response = await fetch(`${API_BASE_URL}/storage/recordings?${params}`)
+    if (!response.ok) throw new Error('Error al obtener grabaciones')
+    return response.json()
+  },
+
+  async triggerStorageCleanup() {
+    const response = await fetch(`${API_BASE_URL}/storage/cleanup`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al iniciar limpieza')
+    return response.json()
+  },
+
+  async checkStorageSpace() {
+    const response = await fetch(`${API_BASE_URL}/storage/check`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al verificar espacio')
+    return response.json()
+  },
+
+  async setRetentionPolicy(scenario, days) {
+    const response = await fetch(`${API_BASE_URL}/storage/retention/${encodeURIComponent(scenario)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days })
+    })
+    if (!response.ok) throw new Error('Error al establecer política de retención')
+    return response.json()
+  },
+
+  async deleteScenarioRecordings(scenario, olderThanDays = 0) {
+    const params = olderThanDays > 0 ? `?olderThan=${olderThanDays}` : ''
+    const response = await fetch(`${API_BASE_URL}/storage/scenario/${encodeURIComponent(scenario)}${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabaciones del escenario')
+    return response.json()
+  },
+
+  async deleteCameraRecordings(cameraId, olderThanDays = 0) {
+    const params = olderThanDays > 0 ? `?olderThan=${olderThanDays}` : ''
+    const response = await fetch(`${API_BASE_URL}/storage/camera/${cameraId}${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabaciones de la cámara')
+    return response.json()
   }
 }
 
