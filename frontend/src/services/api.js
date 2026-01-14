@@ -334,6 +334,93 @@ export const api = {
     })
     if (!response.ok) throw new Error('Error al cancelar tarea')
     return response.json()
+  },
+
+  // Rendimiento y Hardware
+  async getPerformanceStatus() {
+    const response = await fetch(`${API_BASE_URL}/performance/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de rendimiento')
+    return response.json()
+  },
+
+  async getPerformanceMetrics() {
+    const response = await fetch(`${API_BASE_URL}/performance/metrics`)
+    if (!response.ok) throw new Error('Error al obtener métricas')
+    return response.json()
+  },
+
+  async getHardwareInfo() {
+    const response = await fetch(`${API_BASE_URL}/performance/hardware`)
+    if (!response.ok) throw new Error('Error al obtener info de hardware')
+    return response.json()
+  },
+
+  async detectHardware() {
+    const response = await fetch(`${API_BASE_URL}/performance/detect`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detectar hardware')
+    return response.json()
+  },
+
+  async runPerformanceBenchmark() {
+    const response = await fetch(`${API_BASE_URL}/performance/benchmark`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al ejecutar benchmark')
+    return response.json()
+  },
+
+  async setPerformanceProfile(profile) {
+    const response = await fetch(`${API_BASE_URL}/performance/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile })
+    })
+    if (!response.ok) throw new Error('Error al cambiar perfil')
+    return response.json()
+  },
+
+  async setHwAccel(enabled) {
+    const response = await fetch(`${API_BASE_URL}/performance/hwaccel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    })
+    if (!response.ok) throw new Error('Error al configurar hwaccel')
+    return response.json()
+  },
+
+  async getPerformanceConfig() {
+    const response = await fetch(`${API_BASE_URL}/performance/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración')
+    return response.json()
+  },
+
+  async updatePerformanceConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/performance/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async getCacheStats() {
+    const response = await fetch(`${API_BASE_URL}/performance/cache`)
+    if (!response.ok) throw new Error('Error al obtener stats de caché')
+    return response.json()
+  },
+
+  async getAdaptiveStreamConfig(networkSpeed) {
+    const response = await fetch(`${API_BASE_URL}/performance/adaptive-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ networkSpeed })
+    })
+    if (!response.ok) throw new Error('Error al obtener config adaptativa')
+    return response.json()
   }
 }
 

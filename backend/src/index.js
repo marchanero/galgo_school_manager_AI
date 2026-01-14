@@ -17,10 +17,12 @@ import emqxRoutes from './routes/emqx.js'
 import storageRoutes from './routes/storage.js'
 import recordingsRoutes from './routes/recordings.js'
 import processingRoutes from './routes/processing.js'
+import performanceRoutes from './routes/performance.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
 import recordingManager from './services/recordingManager.js'
 import videoProcessor from './services/videoProcessor.js'
+import performanceManager from './services/performanceManager.js'
 import mqttService from './services/mqttService.js'
 import replicationService from './services/replicationService.js'
 import storageManager from './services/storageManager.js'
@@ -98,6 +100,13 @@ mediaServerManager.start().then(() => {
   console.log('✅ Sistema de grabación y streaming iniciado')
 }).catch((error) => {
   console.error('❌ Error iniciando Media Server:', error)
+})
+
+// Inicializar Performance Manager (detección de hardware y optimización)
+performanceManager.initialize().then(() => {
+  console.log('✅ Sistema de rendimiento inicializado')
+}).catch((error) => {
+  console.error('❌ Error inicializando Performance Manager:', error)
 })
 
 // Inicializar Storage Manager para gestión de almacenamiento
@@ -347,6 +356,7 @@ app.use('/api/emqx', emqxRoutes)
 app.use('/api/storage', storageRoutes)
 app.use('/api/recordings', recordingsRoutes)
 app.use('/api/processing', processingRoutes)
+app.use('/api/performance', performanceRoutes)
 
 // Servir archivos estáticos de thumbnails y clips
 app.use('/thumbnails', express.static(path.join(process.cwd(), 'thumbnails')))
@@ -402,7 +412,11 @@ const gracefulShutdown = async (signal) => {
     console.log('🎬 Deteniendo servidor de medios...')
     mediaServerManager.stop()
     
-    // 5. Desconectar base de datos
+    // 5. Detener Performance Manager
+    console.log('⚡ Deteniendo sistema de rendimiento...')
+    performanceManager.stop()
+    
+    // 6. Desconectar base de datos
     console.log('🗄️ Cerrando conexión a base de datos...')
     await prisma.$disconnect()
     
