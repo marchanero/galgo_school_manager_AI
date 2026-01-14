@@ -279,6 +279,44 @@ Los archivos estáticos compilados estarán en `frontend/dist`
 - Se puede usar `ffmpeg` o `GStreamer` para convertir RTSP a HLS/DASH
 - Por defecto, la app usa placeholders para las imágenes del stream
 
+## 🌐 Configuración de Red para Sensores
+
+Si los sensores y cámaras están conectados a través de un router GL.iNet (OpenWRT), es necesario configurar el routing para acceder a ellos desde Ubuntu.
+
+### Topología de Red
+
+```
+Ubuntu (192.168.50.1) ──► GL.iNet Router (192.168.50.2/192.168.8.1) ──► Sensores (192.168.8.x)
+```
+
+### Configuración Rápida
+
+```bash
+# Ejecutar script de configuración automática
+sudo ./scripts/setup-sensor-network.sh --install
+```
+
+### Configuración Manual
+
+1. **Añadir ruta estática en Ubuntu:**
+   ```bash
+   sudo ip route add 192.168.8.0/24 via 192.168.50.2 dev <interfaz_usb>
+   ```
+
+2. **Configurar firewall en GL.iNet:**
+   - Acceder a LuCI: `http://192.168.50.2`
+   - Network → Firewall → Custom Rules
+   - Añadir reglas FORWARD y NAT bypass
+
+Para más detalles, consulta la [documentación completa](docs/network-setup.md).
+
+### Verificar Conectividad
+
+```bash
+ping 192.168.8.210  # Cámara
+ffprobe rtsp://admin:galgo2526@192.168.8.210:554/stream1  # Stream RTSP
+```
+
 ## 🤝 Contribuir
 
 Este es un proyecto base. Siéntete libre de modificar y mejorar según tus necesidades.

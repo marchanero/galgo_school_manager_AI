@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 
 export const cameraConfig = {
+  // Acceso directo a la cámara en la red de sensores
   ip: process.env.CAMERA_IP || '192.168.8.210',
   username: process.env.CAMERA_USER || 'admin',
   password: process.env.CAMERA_PASS || 'galgo2526',

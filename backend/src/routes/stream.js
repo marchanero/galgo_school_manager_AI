@@ -271,4 +271,35 @@ router.get('/:cameraId/test', async (req, res) => {
   }
 })
 
+// GET snapshot - captura un frame único como JPEG (para thumbnails)
+router.get('/:cameraId/snapshot', async (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const camera = await req.prisma.camera.findUnique({
+      where: { id: parseInt(cameraId) }
+    })
+    
+    if (!camera) {
+      return res.status(404).json({ error: 'Cámara no encontrada' })
+    }
+
+    try {
+      const frame = await captureFrame(camera.rtspUrl)
+      res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': frame.length,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      })
+      res.end(frame)
+    } catch (error) {
+      // Devolver una imagen de error/placeholder
+      res.status(503).json({ error: error.message })
+    }
+
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 export default router
