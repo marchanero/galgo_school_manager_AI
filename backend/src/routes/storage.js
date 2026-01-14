@@ -1,5 +1,7 @@
 import express from 'express'
 import storageManager from '../services/storageManager.js'
+import path from 'path'
+import fs from 'fs'
 
 const router = express.Router()
 
@@ -26,6 +28,46 @@ router.get('/status', async (req, res) => {
         alertLevel: storageManager.status.alertLevel
       }
     })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+/**
+ * GET /storage/download
+ * Descarga una grabación específica
+ */
+router.get('/download', (req, res) => {
+  try {
+    const { scenario, date, cameraId, filename } = req.query
+    
+    if (!scenario || !date || !cameraId || !filename) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere scenario, date, cameraId y filename'
+      })
+    }
+    
+    const filePath = path.join(
+      process.cwd(), 
+      'recordings', 
+      scenario, 
+      date, 
+      `camera_${cameraId}`, 
+      filename
+    )
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Grabación no encontrada'
+      })
+    }
+    
+    res.download(filePath, filename)
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -340,6 +382,149 @@ router.post('/check', async (req, res) => {
       data: {
         disk: diskInfo,
         alertLevel: storageManager.status.alertLevel
+      }
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+/**
+ * DELETE /storage/recording
+ * Elimina una grabación específica
+ */
+router.delete('/recording', async (req, res) => {
+  try {
+    const { scenario, date, cameraId, filename } = req.query
+    
+    if (!scenario || !date || !cameraId || !filename) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere scenario, date, cameraId y filename'
+      })
+    }
+    
+    const filePath = path.join(
+      process.cwd(), 
+      'recordings', 
+      scenario, 
+      date, 
+      `camera_${cameraId}`, 
+      filename
+    )
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Grabación no encontrada'
+      })
+    }
+    
+    const stats = fs.statSync(filePath)
+    fs.unlinkSync(filePath)
+    
+    // También eliminar el thumbnail si existe
+    const thumbnailName = filename.replace('.mp4', '_thumb.jpg')
+    const thumbnailPath = path.join(process.cwd(), 'thumbnails', thumbnailName)
+    if (fs.existsSync(thumbnailPath)) {
+      fs.unlinkSync(thumbnailPath)
+    }
+    
+    res.json({
+      success: true,
+      message: 'Grabación eliminada',
+      data: {
+        filename,
+        size: stats.size,
+        sizeFormatted: storageManager.formatBytes(stats.size)
+      }
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+/**
+ * GET /storage/thumbnail/:filename
+ * Sirve un thumbnail específico
+ */
+router.get('/thumbnail/:filename', (req, res) => {
+  try {
+    const { filename } = req.params
+    const thumbnailPath = path.join(process.cwd(), 'thumbnails', filename)
+    
+    if (!fs.existsSync(thumbnailPath)) {
+      // Devolver imagen placeholder
+      return res.status(404).json({
+        success: false,
+        error: 'Thumbnail no encontrado'
+      })
+    }
+    
+    res.sendFile(thumbnailPath)
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+/**
+ * POST /storage/generate-thumbnail
+ * Genera thumbnail para una grabación específica
+ */
+router.post('/generate-thumbnail', async (req, res) => {
+  try {
+    const { scenario, date, cameraId, filename } = req.body
+    
+    if (!scenario || !date || !cameraId || !filename) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere scenario, date, cameraId y filename'
+      })
+    }
+    
+    const videoPath = path.join(
+      process.cwd(), 
+      'recordings', 
+      scenario, 
+      date, 
+      `camera_${cameraId}`, 
+      filename
+    )
+    
+    if (!fs.existsSync(videoPath)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Video no encontrado'
+      })
+    }
+    
+    // Importar videoProcessor
+    const videoProcessor = (await import('../services/videoProcessor.js')).default
+    
+    // Añadir a la cola de procesamiento
+    videoProcessor.addToQueue({
+      type: 'thumbnail',
+      videoPath,
+      options: { timestamp: '00:00:03' },
+      priority: 1,
+      cameraId
+    })
+    
+    res.json({
+      success: true,
+      message: 'Generación de thumbnail añadida a la cola',
+      data: {
+        filename,
+        videoPath
       }
     })
   } catch (error) {

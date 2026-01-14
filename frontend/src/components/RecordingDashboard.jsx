@@ -42,6 +42,10 @@ export default function RecordingDashboard() {
   // Estado para confirmación de detener grabación
   const [confirmStop, setConfirmStop] = useState({ isOpen: false, cameraId: null, cameraName: '' })
   const [confirmStopAll, setConfirmStopAll] = useState(false)
+  // Estado para confirmación de eliminar grabación guardada
+  const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, recording: null })
+  // Estado para generación de thumbnails
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(null)
 
   // Cargar datos - combina grabaciones de recordingManager y mediaServer
   const loadData = useCallback(async () => {
@@ -159,6 +163,53 @@ export default function RecordingDashboard() {
     }
   }
 
+  // Solicitar confirmación para eliminar grabación guardada
+  const requestDeleteRecording = (recording) => {
+    setConfirmDelete({ isOpen: true, recording })
+  }
+
+  // Confirmar y eliminar grabación guardada
+  const confirmDeleteRecording = async () => {
+    const { recording } = confirmDelete
+    if (!recording) return
+    
+    try {
+      await api.deleteStorageRecording(
+        recording.scenario,
+        recording.date,
+        recording.cameraId,
+        recording.filename
+      )
+      toast.success(`Grabación "${recording.filename}" eliminada`)
+      setConfirmDelete({ isOpen: false, recording: null })
+      loadData()
+    } catch (error) {
+      console.error('Error eliminando grabación:', error)
+      toast.error('Error al eliminar grabación')
+    }
+  }
+
+  // Generar thumbnail para una grabación
+  const handleGenerateThumbnail = async (recording) => {
+    setGeneratingThumbnail(recording.filename)
+    try {
+      await api.generateThumbnail(
+        recording.scenario,
+        recording.date,
+        recording.cameraId,
+        recording.filename
+      )
+      toast.success('Thumbnail añadido a la cola de procesamiento')
+      // Recargar después de un momento para que se genere
+      setTimeout(() => loadData(), 3000)
+    } catch (error) {
+      console.error('Error generando thumbnail:', error)
+      toast.error('Error al generar thumbnail')
+    } finally {
+      setGeneratingThumbnail(null)
+    }
+  }
+
   // Guardar configuración
   const saveConfig = async () => {
     try {
@@ -218,9 +269,20 @@ export default function RecordingDashboard() {
 
   // Obtener URL del thumbnail para un video
   const getThumbnailUrl = (recording) => {
-    // Intentar construir la URL del thumbnail basándose en el nombre del video
+    // Construir la URL del thumbnail basándose en el nombre del video
     const videoName = recording.filename?.replace('.mp4', '') || ''
-    return `/api/processing/thumbnails/${videoName}_thumb.jpg`
+    return `/api/storage/thumbnail/${videoName}_thumb.jpg`
+  }
+
+  // Construir URL de descarga
+  const getDownloadUrl = (recording) => {
+    const params = new URLSearchParams({
+      scenario: recording.scenario,
+      date: recording.date,
+      cameraId: recording.cameraId,
+      filename: recording.filename
+    })
+    return `/api/storage/download?${params}`
   }
 
   // Filtrar grabaciones guardadas
@@ -557,7 +619,7 @@ export default function RecordingDashboard() {
                   className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {/* Thumbnail */}
-                  <div className="relative aspect-video bg-gray-100 dark:bg-gray-900">
+                  <div className="relative aspect-video bg-gray-100 dark:bg-gray-900 group">
                     <img
                       src={getThumbnailUrl(recording)}
                       alt={recording.filename}
@@ -567,8 +629,15 @@ export default function RecordingDashboard() {
                         e.target.nextSibling.style.display = 'flex'
                       }}
                     />
-                    <div className="hidden absolute inset-0 items-center justify-center bg-gray-200 dark:bg-gray-700">
-                      <Image className="h-12 w-12 text-gray-400" />
+                    <div className="hidden absolute inset-0 items-center justify-center bg-gray-200 dark:bg-gray-700 flex-col gap-2">
+                      <Image className="h-10 w-10 text-gray-400" />
+                      <button
+                        onClick={() => handleGenerateThumbnail(recording)}
+                        disabled={generatingThumbnail === recording.filename}
+                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {generatingThumbnail === recording.filename ? 'Generando...' : 'Generar Thumbnail'}
+                      </button>
                     </div>
                     {/* Duración */}
                     {recording.duration && (
@@ -576,6 +645,15 @@ export default function RecordingDashboard() {
                         {formatDuration(recording.duration * 1000)}
                       </div>
                     )}
+                    {/* Botón de generar thumbnail en hover */}
+                    <button
+                      onClick={() => handleGenerateThumbnail(recording)}
+                      disabled={generatingThumbnail === recording.filename}
+                      className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 disabled:opacity-50"
+                      title="Regenerar thumbnail"
+                    >
+                      <Image className="h-4 w-4" />
+                    </button>
                   </div>
                   
                   {/* Info */}
@@ -606,15 +684,17 @@ export default function RecordingDashboard() {
                     {/* Acciones */}
                     <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                       <a
-                        href={`/api/media/download/${recording.cameraId}/${recording.filename}`}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded"
+                        href={getDownloadUrl(recording)}
+                        download={recording.filename}
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded transition-colors"
                       >
                         <Download className="h-3.5 w-3.5" />
                         Descargar
                       </a>
                       <button
-                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded"
-                        title="Eliminar"
+                        onClick={() => requestDeleteRecording(recording)}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded transition-colors"
+                        title="Eliminar grabación"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -745,6 +825,18 @@ export default function RecordingDashboard() {
         title="Detener Todas las Grabaciones"
         message={`¿Estás seguro de que deseas detener todas las grabaciones (${recordings.length} activas)? Todos los archivos se guardarán automáticamente.`}
         confirmText="Sí, detener todas"
+        cancelText="Cancelar"
+        isDanger={true}
+      />
+
+      {/* Modal de confirmación para eliminar grabación guardada */}
+      <ConfirmModal
+        isOpen={confirmDelete.isOpen}
+        onClose={() => setConfirmDelete({ isOpen: false, recording: null })}
+        onConfirm={confirmDeleteRecording}
+        title="Eliminar Grabación"
+        message={`¿Estás seguro de que deseas eliminar "${confirmDelete.recording?.filename}"? Esta acción no se puede deshacer.`}
+        confirmText="Sí, eliminar"
         cancelText="Cancelar"
         isDanger={true}
       />

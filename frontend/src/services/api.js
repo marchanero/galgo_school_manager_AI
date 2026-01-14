@@ -157,6 +157,25 @@ export const api = {
     return response.json()
   },
 
+  async deleteStorageRecording(scenario, date, cameraId, filename) {
+    const params = new URLSearchParams({ scenario, date, cameraId, filename })
+    const response = await fetch(`${API_BASE_URL}/storage/recording?${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabación')
+    return response.json()
+  },
+
+  async generateThumbnail(scenario, date, cameraId, filename) {
+    const response = await fetch(`${API_BASE_URL}/storage/generate-thumbnail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario, date, cameraId, filename })
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnail')
+    return response.json()
+  },
+
   async triggerStorageCleanup() {
     const response = await fetch(`${API_BASE_URL}/storage/cleanup`, {
       method: 'POST'
