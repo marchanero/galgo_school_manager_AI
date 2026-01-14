@@ -62,4 +62,24 @@ router.post('/start', async (req, res) => {
   }
 })
 
+// GET /api/replication/disk-info - Obtener información del disco local
+router.get('/disk-info', async (req, res) => {
+  try {
+    const diskInfo = await replicationService.getLocalDiskInfo()
+    res.json(diskInfo)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+// GET /api/replication/remote-disk-info - Obtener información del disco remoto
+router.get('/remote-disk-info', async (req, res) => {
+  try {
+    const diskInfo = await replicationService.getRemoteDiskInfo()
+    res.json(diskInfo)
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 export default router

@@ -261,9 +261,13 @@ class ReplicationService {
 
     walk(localPath)
 
-    // Calcular archivos pendientes (estimación basada en dry-run de rsync)
-    // Esto puede ser lento, así que lo hacemos solo si se pide explícitamente o asumimos 0 si recién sincronizamos
-    // Por ahora, devolvemos estadísticas básicas
+    // Obtener información del espacio en disco local
+    let localDiskInfo = null
+    try {
+      localDiskInfo = await this.getLocalDiskInfo()
+    } catch (error) {
+      console.error('Error obteniendo información del disco local:', error)
+    }
     
     return {
       totalFiles,
@@ -271,7 +275,188 @@ class ReplicationService {
       lastSyncTime: this.lastSyncTime,
       isReplicating: this.isReplicating,
       retentionDays: this.retentionDays,
-      deleteAfterExport: this.deleteAfterExport
+      deleteAfterExport: this.deleteAfterExport,
+      localDiskInfo
+    }
+  }
+
+  async getRemoteDiskInfo() {
+    // Verificar si está configurado
+    if (!config.replication.host) {
+      // Devolver datos dummy cuando no está configurado
+      return {
+        available: true,
+        filesystem: '/dev/sdb1',
+        mountPoint: '/mnt/remote-backups',
+        totalGB: 500,
+        usedGB: 175,
+        availableGB: 325,
+        usePercent: 35,
+        lastChecked: new Date().toISOString(),
+        isDummy: true
+      }
+    }
+
+    try {
+      const { host, user, remotePath, sshKeyPath } = config.replication
+
+      // Ejecutar comando SSH para obtener información del disco
+      const sshArgs = [
+        '-o', 'StrictHostKeyChecking=no',
+        '-o', 'ConnectTimeout=10'
+      ]
+
+      if (sshKeyPath) {
+        sshArgs.push('-i', sshKeyPath)
+      }
+
+      sshArgs.push(`${user}@${host}`, `df -BG ${remotePath} | tail -1`)
+
+      console.log('🔍 Consultando espacio en disco remoto:', `ssh ${sshArgs.join(' ')}`)
+
+      const output = await new Promise((resolve, reject) => {
+        const ssh = spawn('ssh', sshArgs)
+        let stdout = ''
+        let stderr = ''
+
+        ssh.stdout.on('data', (data) => { stdout += data.toString() })
+        ssh.stderr.on('data', (data) => { stderr += data.toString() })
+
+        ssh.on('close', (code) => {
+          if (code === 0) {
+            resolve(stdout.trim())
+          } else {
+            reject(new Error(`SSH failed with code ${code}: ${stderr}`))
+          }
+        })
+
+        ssh.on('error', (error) => {
+          reject(error)
+        })
+      })
+
+      // Parsear la salida de df
+      // Formato típico: /dev/sda1     50G    25G    23G    53% /mnt/videos
+      const parts = output.split(/\s+/).filter(part => part.trim() !== '')
+
+      if (parts.length < 6) {
+        throw new Error('Formato de salida df inesperado')
+      }
+
+      const totalGB = parseInt(parts[1].replace('G', ''))
+      const usedGB = parseInt(parts[2].replace('G', ''))
+      const availableGB = parseInt(parts[3].replace('G', ''))
+      const usePercent = parseInt(parts[4].replace('%', ''))
+
+      return {
+        available: true,
+        filesystem: parts[0],
+        mountPoint: parts[5],
+        totalGB,
+        usedGB,
+        availableGB,
+        usePercent,
+        lastChecked: new Date().toISOString()
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo información del disco remoto:', error)
+      return {
+        available: false,
+        error: error.message
+      }
+    }
+  }
+
+  /**
+   * Obtiene información del espacio en disco local (donde están las grabaciones)
+   */
+  async getLocalDiskInfo() {
+    try {
+      const recordingsPath = path.join(process.cwd(), 'recordings')
+
+      // Ejecutar df para obtener información del disco donde están las grabaciones
+      const output = await new Promise((resolve, reject) => {
+        const df = spawn('df', ['-BG', recordingsPath])
+        let stdout = ''
+        let stderr = ''
+
+        df.stdout.on('data', (data) => { stdout += data.toString() })
+        df.stderr.on('data', (data) => { stderr += data.toString() })
+
+        df.on('close', (code) => {
+          if (code === 0) {
+            resolve(stdout.trim())
+          } else {
+            reject(new Error(`df failed with code ${code}: ${stderr}`))
+          }
+        })
+
+        df.on('error', (error) => {
+          reject(error)
+        })
+      })
+
+      // Parsear la salida de df (tomar la segunda línea, la primera es header)
+      const lines = output.split('\n').filter(line => line.trim() !== '')
+      if (lines.length < 2) {
+        throw new Error('Formato de salida df inesperado')
+      }
+
+      const parts = lines[1].split(/\s+/).filter(part => part.trim() !== '')
+
+      if (parts.length < 6) {
+        throw new Error('Formato de salida df insuficiente')
+      }
+
+      const totalGB = parseInt(parts[1].replace('G', ''))
+      const usedGB = parseInt(parts[2].replace('G', ''))
+      const availableGB = parseInt(parts[3].replace('G', ''))
+      const usePercent = parseInt(parts[4].replace('%', ''))
+
+      // Obtener información adicional del directorio
+      let recordingsSize = 0
+      let recordingsCount = 0
+
+      try {
+        const walk = (dir) => {
+          if (!fs.existsSync(dir)) return
+          const list = fs.readdirSync(dir)
+          list.forEach(file => {
+            const filePath = path.join(dir, file)
+            const stat = fs.statSync(filePath)
+            if (stat && stat.isDirectory()) {
+              walk(filePath)
+            } else if (file.endsWith('.mp4') || file.endsWith('.jsonl')) {
+              recordingsCount++
+              recordingsSize += stat.size
+            }
+          })
+        }
+        walk(recordingsPath)
+      } catch (error) {
+        console.warn('⚠️ Error calculando tamaño de recordings:', error.message)
+      }
+
+      return {
+        available: true,
+        filesystem: parts[0],
+        mountPoint: parts[5],
+        totalGB,
+        usedGB,
+        availableGB,
+        usePercent,
+        recordingsSize,
+        recordingsCount,
+        lastChecked: new Date().toISOString()
+      }
+
+    } catch (error) {
+      console.error('❌ Error obteniendo información del disco local:', error)
+      return {
+        available: false,
+        error: error.message
+      }
     }
   }
 
