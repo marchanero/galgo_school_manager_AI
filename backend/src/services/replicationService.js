@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import cron from 'node-cron'
-import config from '../config.js'
+import { replication as replicationConfig } from '../config.js'
 
 class ReplicationService {
   constructor() {
@@ -118,7 +118,7 @@ class ReplicationService {
 
     // Verificar si está habilitado en config.js (nivel sistema)
     // La habilitación en DB es para el scheduler, pero config.js manda si no hay credenciales
-    if (!config.replication.host) {
+    if (!replicationConfig.host) {
       console.log('⚠️ Replicación no configurada (faltan credenciales)')
       return { success: false, message: 'Faltan credenciales de replicación' }
     }
@@ -127,7 +127,7 @@ class ReplicationService {
     console.log('🔄 Iniciando replicación de videos...')
 
     try {
-      const { host, user, remotePath, sshKeyPath } = config.replication
+      const { host, user, remotePath, sshKeyPath } = replicationConfig
       const localPath = path.join(process.cwd(), 'recordings') + '/' // Trailing slash importante para rsync
 
       // Construir comando rsync
@@ -281,24 +281,51 @@ class ReplicationService {
   }
 
   async getRemoteDiskInfo() {
-    // Verificar si está configurado
-    if (!config.replication.host) {
-      // Devolver datos dummy cuando no está configurado
+    // Usar mock si está configurado o si no hay servidor remoto
+    if (replicationConfig.useMock || !replicationConfig.host) {
+      console.log('🔧 Usando datos mock para servidor remoto de replicación')
+      
+      const totalTB = replicationConfig.mockCapacityTB || 5
+      const totalGB = totalTB * 1024
+      const usedPercent = Math.floor(Math.random() * 30) + 10 // 10-40% usado
+      const usedGB = Math.floor((totalGB * usedPercent) / 100)
+      const availableGB = totalGB - usedGB
+      
       return {
         available: true,
         filesystem: '/dev/sdb1',
         mountPoint: '/mnt/remote-backups',
-        totalGB: 500,
-        usedGB: 175,
-        availableGB: 325,
-        usePercent: 35,
+        totalGB,
+        usedGB,
+        availableGB,
+        usePercent,
         lastChecked: new Date().toISOString(),
-        isDummy: true
+        isMock: true,
+        serverType: 'Mock Server',
+        description: `${totalTB}TB External Storage Server (Mock)`,
+        status: 'online',
+        connectionType: 'Mock Connection',
+        estimatedTransferSpeed: '100 MB/s',
+        lastReplicationSize: Math.floor(Math.random() * 500) + 100, // 100-600 GB
+        replicationHistory: [
+          {
+            date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            sizeGB: Math.floor(Math.random() * 200) + 50,
+            duration: Math.floor(Math.random() * 1800) + 600, // 10-30 min
+            success: true
+          },
+          {
+            date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+            sizeGB: Math.floor(Math.random() * 150) + 25,
+            duration: Math.floor(Math.random() * 1200) + 300,
+            success: true
+          }
+        ]
       }
     }
 
     try {
-      const { host, user, remotePath, sshKeyPath } = config.replication
+      const { host, user, remotePath, sshKeyPath } = replicationConfig
 
       // Ejecutar comando SSH para obtener información del disco
       const sshArgs = [

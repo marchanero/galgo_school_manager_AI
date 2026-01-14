@@ -25,7 +25,10 @@ export const replication = {
   host: process.env.REPLICATION_HOST,
   user: process.env.REPLICATION_USER,
   remotePath: process.env.REPLICATION_PATH,
-  sshKeyPath: process.env.REPLICATION_SSH_KEY
+  sshKeyPath: process.env.REPLICATION_SSH_KEY,
+  // Configuración para mock de pruebas
+  useMock: process.env.REPLICATION_USE_MOCK === 'true',
+  mockCapacityTB: parseInt(process.env.REPLICATION_MOCK_CAPACITY_TB) || 5
 }
 
 // Configuración de almacenamiento y retención
