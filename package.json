@@ -8,7 +8,7 @@
     "install:frontend": "cd frontend && npm install",
     "install:client2": "cd client2-visualizer && npm install",
     "install:test-publisher": "cd test_publisher && npm install",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:client2\" \"npm run dev:test-publisher\" \"npm run dev:mosquitto\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:test-publisher\" \"npm run dev:mosquitto\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:client2": "cd client2-visualizer && npm run dev",

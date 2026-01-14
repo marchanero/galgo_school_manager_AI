@@ -31,7 +31,9 @@ import {
   Theater,
   Maximize2,
   Image,
-  Tv
+  Tv,
+  Film,
+  Gauge
 } from 'lucide-react'
 
 const DashboardSummary = () => {
@@ -101,6 +103,11 @@ const DashboardSummary = () => {
   
   // Referencia para el tiempo de inicio de grabación (para cálculo preciso)
   const recordingStartTime = useRef(null)
+  // Referencias para funciones del contexto (evita re-renders)
+  const getMaxElapsedSecondsRef = useRef(getMaxElapsedSeconds)
+  const getOldestStartTimeRef = useRef(getOldestStartTime)
+  getMaxElapsedSecondsRef.current = getMaxElapsedSeconds
+  getOldestStartTimeRef.current = getOldestStartTime
 
   /**
    * Calcula el tiempo transcurrido basándose en el timestamp de inicio
@@ -108,7 +115,7 @@ const DashboardSummary = () => {
    */
   const calculateElapsedTime = useCallback(() => {
     // Primero intentar obtener del contexto de recording
-    const syncedElapsed = getMaxElapsedSeconds()
+    const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
     if (syncedElapsed > 0) {
       return syncedElapsed
     }
@@ -116,7 +123,7 @@ const DashboardSummary = () => {
     // Fallback al cálculo local
     if (!recordingStartTime.current) return 0
     return Math.max(0, Math.floor((Date.now() - recordingStartTime.current) / 1000))
-  }, [getMaxElapsedSeconds])
+  }, []) // Sin dependencias - usa refs
 
   // Timer para grabación - ahora usa cálculo basado en timestamp
   useEffect(() => {
@@ -153,8 +160,8 @@ const DashboardSummary = () => {
       setRecordingState('recording')
       // Sincronizar tiempo transcurrido desde el backend
       if (initialSyncDone) {
-        const syncedElapsed = getMaxElapsedSeconds()
-        const oldestStart = getOldestStartTime()
+        const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
+        const oldestStart = getOldestStartTimeRef.current?.()
         
         if (oldestStart) {
           recordingStartTime.current = new Date(oldestStart).getTime()
@@ -173,13 +180,13 @@ const DashboardSummary = () => {
       recordingStartTime.current = null
       setElapsedTime(0)
     }
-  }, [activeRecordingsCount, recordingState, initialSyncDone, getMaxElapsedSeconds, getOldestStartTime, calculateElapsedTime])
+  }, [activeRecordingsCount, recordingState, initialSyncDone, calculateElapsedTime])
 
   // Sincronización inicial del timer cuando se completa el sync con backend
   useEffect(() => {
     if (initialSyncDone && activeRecordingsCount > 0) {
-      const syncedElapsed = getMaxElapsedSeconds()
-      const oldestStart = getOldestStartTime()
+      const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
+      const oldestStart = getOldestStartTimeRef.current?.()
       
       if (oldestStart) {
         recordingStartTime.current = new Date(oldestStart).getTime()
@@ -190,7 +197,7 @@ const DashboardSummary = () => {
         setElapsedTime(syncedElapsed)
       }
     }
-  }, [initialSyncDone, activeRecordingsCount, getMaxElapsedSeconds, getOldestStartTime])
+  }, [initialSyncDone, activeRecordingsCount])
 
   // Verificar estado de cámara
   const checkCameraStatus = async (cameraId) => {

@@ -24,6 +24,9 @@ const RecordingControlGlobal = () => {
   const recordingStartTime = useRef(null)
   const pauseStartTime = useRef(null)
   const totalPausedDuration = useRef(0)
+  // Referencia para recordings (evita re-renders infinitos)
+  const recordingsRef = useRef(recordings)
+  recordingsRef.current = recordings
 
   // Cargar cámaras al montar el componente
   useEffect(() => {
@@ -76,12 +79,12 @@ const RecordingControlGlobal = () => {
    * Obtiene el startTime real de las grabaciones activas
    */
   const syncTimeWithBackend = useCallback(async () => {
-    if (recordings.size === 0) return
+    if (recordingsRef.current.size === 0) return
     
     try {
       // Obtener el startedAt más antiguo de las grabaciones activas
       let earliestStart = null
-      for (const [, recordingInfo] of recordings.entries()) {
+      for (const [, recordingInfo] of recordingsRef.current.entries()) {
         if (recordingInfo.startedAt) {
           const startDate = new Date(recordingInfo.startedAt)
           if (!earliestStart || startDate < earliestStart) {
@@ -100,7 +103,7 @@ const RecordingControlGlobal = () => {
     } catch (error) {
       console.error('Error sincronizando tiempo:', error)
     }
-  }, [recordings, calculateElapsedTime])
+  }, [calculateElapsedTime]) // Removido recordings de las dependencias
 
   // Timer effect - ahora calcula el tiempo real en lugar de incrementar
   useEffect(() => {
@@ -158,7 +161,7 @@ const RecordingControlGlobal = () => {
     if (activeRecordingsCount > 0 && recordingState === 'idle') {
       // Obtener el tiempo de inicio de las grabaciones activas
       let earliestStart = null
-      for (const [, recordingInfo] of recordings.entries()) {
+      for (const [, recordingInfo] of recordingsRef.current.entries()) {
         if (recordingInfo.startedAt) {
           const startDate = new Date(recordingInfo.startedAt)
           if (!earliestStart || startDate < earliestStart) {
@@ -191,7 +194,7 @@ const RecordingControlGlobal = () => {
       setPausedTime(0)
       setTotalRecordingTime(0)
     }
-  }, [activeRecordingsCount, recordings, recordingState, calculateElapsedTime])
+  }, [activeRecordingsCount, recordingState, calculateElapsedTime]) // Removido recordings de las dependencias
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
