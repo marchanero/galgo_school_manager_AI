@@ -90,6 +90,12 @@ export const api = {
     })
     if (!response.ok) throw new Error('Error al iniciar replicación')
     return response.json()
+  },
+
+  async getReplicationDiskInfo() {
+    const response = await fetch(`${API_BASE_URL}/replication/disk-info`)
+    if (!response.ok) throw new Error('Error al obtener información del disco local')
+    return response.json()
   }
 }
 

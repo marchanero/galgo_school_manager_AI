@@ -4,6 +4,7 @@ import { useMQTT } from '../contexts/MQTTContext'
 import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
 import CameraThumbnail from './CameraThumbnail'
+import { toast } from 'react-hot-toast'
 import { 
   Video, 
   Circle, 
@@ -45,6 +46,14 @@ const DashboardSummary = () => {
     activeSensors: 0,
     messagesPerSecond: 0,
     mqttStatus: 'disconnected'
+  })
+  const [localDiskInfo, setLocalDiskInfo] = useState(null)
+  const [remoteDiskInfo, setRemoteDiskInfo] = useState(null)
+  const [diskNotifications, setDiskNotifications] = useState({
+    localWarningShown: false,
+    localCriticalShown: false,
+    remoteWarningShown: false,
+    remoteCriticalShown: false
   })
   
   const { 
@@ -108,6 +117,64 @@ const DashboardSummary = () => {
       return data.active || false
     } catch {
       return true
+    }
+  }
+
+  // Función para verificar niveles de disco y mostrar notificaciones
+  const checkDiskLevels = (diskInfo, diskType) => {
+    if (!diskInfo?.available || !diskInfo.usePercent) return
+
+    const usePercent = diskInfo.usePercent
+    const isLocal = diskType === 'local'
+    
+    // Reset notifications if disk usage drops below thresholds
+    if (usePercent < 70) {
+      setDiskNotifications(prev => ({
+        ...prev,
+        [`${diskType}WarningShown`]: false,
+        [`${diskType}CriticalShown`]: false
+      }))
+      return
+    }
+
+    // Warning at 75%
+    if (usePercent >= 75 && usePercent < 90 && !diskNotifications[`${diskType}WarningShown`]) {
+      toast.warning(
+        `⚠️ Disco ${isLocal ? 'Local' : 'Remoto'} casi lleno`,
+        {
+          description: `${usePercent}% usado. Considere liberar espacio.`,
+          duration: 6000,
+          style: {
+            background: '#fef3c7',
+            color: '#92400e',
+            border: '1px solid #f59e0b',
+          },
+        }
+      )
+      setDiskNotifications(prev => ({
+        ...prev,
+        [`${diskType}WarningShown`]: true
+      }))
+    }
+
+    // Critical at 90%
+    if (usePercent >= 90 && !diskNotifications[`${diskType}CriticalShown`]) {
+      toast.error(
+        `🚨 Disco ${isLocal ? 'Local' : 'Remoto'} CRÍTICAMENTE lleno`,
+        {
+          description: `${usePercent}% usado. ¡Libere espacio inmediatamente!`,
+          duration: 8000,
+          style: {
+            background: '#fee2e2',
+            color: '#991b1b',
+            border: '1px solid #dc2626',
+          },
+        }
+      )
+      setDiskNotifications(prev => ({
+        ...prev,
+        [`${diskType}CriticalShown`]: true
+      }))
     }
   }
 
@@ -179,6 +246,47 @@ const DashboardSummary = () => {
     
     fetchSyncStatus()
     const interval = setInterval(fetchSyncStatus, 10000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Cargar información del disco local
+  useEffect(() => {
+    const fetchDiskInfo = async () => {
+      try {
+        const data = await api.getReplicationDiskInfo()
+        setLocalDiskInfo(data)
+        if (data) checkDiskLevels(data, 'local')
+      } catch (error) {
+        console.error('Error cargando información del disco:', error)
+        setLocalDiskInfo(null)
+      }
+    }
+
+    fetchDiskInfo()
+    const interval = setInterval(fetchDiskInfo, 30000) // Actualizar cada 30s
+    return () => clearInterval(interval)
+  }, [])
+
+  // Cargar información del disco remoto
+  useEffect(() => {
+    const fetchRemoteDiskInfo = async () => {
+      try {
+        const response = await fetch('/api/replication/remote-disk-info')
+        if (response.ok) {
+          const data = await response.json()
+          setRemoteDiskInfo(data)
+          if (data) checkDiskLevels(data, 'remote')
+        } else {
+          setRemoteDiskInfo(null)
+        }
+      } catch (error) {
+        console.error('Error cargando información del disco remoto:', error)
+        setRemoteDiskInfo(null)
+      }
+    }
+
+    fetchRemoteDiskInfo()
+    const interval = setInterval(fetchRemoteDiskInfo, 30000) // Actualizar cada 30s
     return () => clearInterval(interval)
   }, [])
 
@@ -668,7 +776,7 @@ const DashboardSummary = () => {
         <div className="space-y-4">
           
           {/* KPIs Grid Compacto */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Cámaras */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
               <div className="flex items-start justify-between">
@@ -708,6 +816,133 @@ const DashboardSummary = () => {
                 </div>
                 <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
                   <Circle className="w-5 h-5 text-red-600 dark:text-red-400 fill-current" />
+                </div>
+              </div>
+            </div>
+
+            {/* Disco Local */}
+            <div className={`rounded-xl p-4 border transition-all duration-300 ${
+              localDiskInfo?.usePercent > 90 
+                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' 
+                : localDiskInfo?.usePercent > 75 
+                ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className={`text-xs font-medium uppercase tracking-wide ${
+                    localDiskInfo?.usePercent > 90 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : localDiskInfo?.usePercent > 75 
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Disco Local
+                  </p>
+                  {localDiskInfo?.available ? (
+                    <div className="mt-1">
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {localDiskInfo.availableGB}GB
+                      </p>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
+                        <div 
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            localDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                            localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${localDiskInfo.usePercent}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {localDiskInfo.usePercent}% usado
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      No disponible
+                    </p>
+                  )}
+                </div>
+                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${
+                  localDiskInfo?.usePercent > 90 
+                    ? 'bg-red-100 dark:bg-red-900/30' 
+                    : localDiskInfo?.usePercent > 75 
+                    ? 'bg-yellow-100 dark:bg-yellow-900/30'
+                    : 'bg-orange-100 dark:bg-orange-900/30'
+                }`}>
+                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${
+                    localDiskInfo?.usePercent > 90 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : localDiskInfo?.usePercent > 75 
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-orange-600 dark:text-orange-400'
+                  }`} />
+                </div>
+              </div>
+            </div>
+
+            {/* Disco Remoto */}
+            <div className={`rounded-xl p-4 border transition-all duration-300 ${
+              remoteDiskInfo?.usePercent > 90 
+                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' 
+                : remoteDiskInfo?.usePercent > 75 
+                ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            }`}>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className={`text-xs font-medium uppercase tracking-wide ${
+                    remoteDiskInfo?.usePercent > 90 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : remoteDiskInfo?.usePercent > 75 
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                  }`}>
+                    Disco Remoto
+                  </p>
+                  {remoteDiskInfo?.available ? (
+                    <div className="mt-1">
+                      <p className="text-lg font-bold text-gray-900 dark:text-white">
+                        {remoteDiskInfo.availableGB}GB
+                      </p>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
+                        <div 
+                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                            remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                            remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${remoteDiskInfo.usePercent}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                        {remoteDiskInfo.usePercent}% usado
+                        {remoteDiskInfo.isDummy && (
+                          <span className="px-1.5 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs rounded-full font-medium">
+                            Demo
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                      No configurado
+                    </p>
+                  )}
+                </div>
+                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${
+                  remoteDiskInfo?.usePercent > 90 
+                    ? 'bg-red-100 dark:bg-red-900/30' 
+                    : remoteDiskInfo?.usePercent > 75 
+                    ? 'bg-amber-100 dark:bg-amber-900/30'
+                    : 'bg-indigo-100 dark:bg-indigo-900/30'
+                }`}>
+                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${
+                    remoteDiskInfo?.usePercent > 90 
+                      ? 'text-red-600 dark:text-red-400' 
+                      : remoteDiskInfo?.usePercent > 75 
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-indigo-600 dark:text-indigo-400'
+                  }`} />
                 </div>
               </div>
             </div>
