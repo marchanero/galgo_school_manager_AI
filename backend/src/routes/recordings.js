@@ -1,5 +1,6 @@
 import express from 'express'
 import recordingManager from '../services/recordingManager.js'
+import videoProcessor from '../services/videoProcessor.js'
 
 const router = express.Router()
 
@@ -130,6 +131,100 @@ router.get('/:cameraId/is-recording', (req, res) => {
     res.json({ success: true, cameraId: parseInt(cameraId), isRecording })
   } catch (error) {
     console.error('Error verificando grabación:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * POST /api/recordings/combine-segments
+ * Combina segmentos de grabación en un archivo único
+ * 
+ * Body:
+ * - recordingDir: Directorio con los segmentos
+ * - outputName: Nombre del archivo de salida (opcional)
+ * - deleteSegments: Si eliminar los segmentos originales (opcional, default: false)
+ * - applyFaststart: Si aplicar faststart para streaming (opcional, default: true)
+ */
+router.post('/combine-segments', async (req, res) => {
+  try {
+    const { 
+      recordingDir, 
+      outputName = 'recording_combined.mp4',
+      deleteSegments = false,
+      applyFaststart = true 
+    } = req.body
+
+    if (!recordingDir) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere recordingDir'
+      })
+    }
+
+    const result = await videoProcessor.combineRecordingSession(recordingDir, {
+      outputName,
+      deleteSegments,
+      applyFaststart
+    })
+
+    res.json(result)
+  } catch (error) {
+    console.error('Error combinando segmentos:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * POST /api/recordings/apply-faststart
+ * Aplica faststart a un video (mueve moov atom al inicio para streaming)
+ * 
+ * Body:
+ * - videoPath: Ruta al video
+ */
+router.post('/apply-faststart', async (req, res) => {
+  try {
+    const { videoPath } = req.body
+
+    if (!videoPath) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere videoPath'
+      })
+    }
+
+    const result = await videoProcessor.applyFaststart(videoPath)
+    res.json(result)
+  } catch (error) {
+    console.error('Error aplicando faststart:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * GET /api/recordings/memory-config
+ * Obtiene la configuración de memoria del sistema de grabación
+ */
+router.get('/memory-config', (req, res) => {
+  try {
+    const config = recordingManager.config
+    res.json({
+      success: true,
+      memoryOptimizations: {
+        segmentTime: `${config.segmentTime} segundos (${config.segmentTime / 60} minutos)`,
+        inputBufferSize: config.inputBufferSize,
+        maxMuxingQueue: config.maxMuxingQueue,
+        analyzeDuration: config.analyzeDuration,
+        probeSize: config.probeSize
+      },
+      tips: [
+        'Los segmentos de 5 minutos reducen el uso de memoria vs 1 hora',
+        'El buffer de entrada está limitado a 16MB',
+        'Use POST /combine-segments para unir segmentos después de grabar',
+        'Use POST /apply-faststart para optimizar videos para streaming'
+      ]
+    })
+  } catch (error) {
+    console.error('Error obteniendo config de memoria:', error)
     res.status(500).json({ success: false, error: error.message })
   }
 })

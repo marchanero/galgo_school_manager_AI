@@ -34,8 +34,15 @@ class RecordingManager extends EventEmitter {
       healthCheckInterval: 30000, // Verificar cada 30 segundos
       staleTimeout: 60000,        // Considerar muerto si no hay actividad en 60s
       
-      // Segmentación
-      segmentTime: 3600, // 1 hora por archivo
+      // Segmentación optimizada para memoria
+      segmentTime: 300,           // 5 minutos por archivo (antes 1 hora)
+                                  // Reduce uso de memoria y riesgo de pérdida
+      
+      // Límites de memoria FFmpeg
+      inputBufferSize: '16M',     // Buffer de entrada RTSP (antes ilimitado)
+      maxMuxingQueue: 512,        // Cola de muxing (antes 9999)
+      analyzeDuration: '2M',      // Tiempo de análisis inicial
+      probeSize: '2M',            // Tamaño de probe inicial
       
       // FFmpeg
       ffmpegPath: 'ffmpeg'
@@ -215,32 +222,52 @@ class RecordingManager extends EventEmitter {
     const scenarioInfo = scenarioName ? ` (Escenario: ${scenarioName})` : ''
     console.log(`💾 Iniciando grabación resiliente: ${camera.name}${scenarioInfo}`)
     
-    // Argumentos FFmpeg optimizados con detección de errores
+    // Argumentos FFmpeg optimizados para bajo consumo de memoria
+    // 
+    // OPTIMIZACIONES DE MEMORIA:
+    // 1. Segmentos de 5 min (antes 1h) - reduce buffer en memoria
+    // 2. rtbufsize limita buffer RTSP a 16MB
+    // 3. max_muxing_queue_size reducido de 9999 a 512
+    // 4. analyzeduration/probesize limitan análisis inicial
+    // 5. fflags +genpts+discardcorrupt evita acumulación de frames corruptos
+    // 6. NO usamos movflags=+faststart (requiere reescritura completa en memoria)
+    //    En su lugar, post-procesamos con qt-faststart si es necesario
+    //
     const ffmpegArgs = [
-      // Input
+      // ===== LÍMITES DE MEMORIA DE ENTRADA =====
+      '-rtbufsize', this.config.inputBufferSize,  // Buffer circular RTSP (16MB)
+      '-analyzeduration', this.config.analyzeDuration,  // Límite análisis stream
+      '-probesize', this.config.probeSize,              // Límite probe inicial
+      
+      // ===== INPUT RTSP =====
       '-rtsp_transport', 'tcp',
       '-stimeout', '5000000',     // Timeout de conexión 5s
+      '-fflags', '+genpts+discardcorrupt',  // Generar timestamps, descartar frames corruptos
       '-i', camera.rtspUrl,
       
-      // Codec
+      // ===== CODEC (copy = sin transcodificación = menos CPU/RAM) =====
       '-c:v', 'copy',
       '-c:a', 'aac',
       '-b:a', '128k',
       
-      // Segmentación
+      // ===== SEGMENTACIÓN OPTIMIZADA =====
       '-f', 'segment',
-      '-segment_time', this.config.segmentTime.toString(),
+      '-segment_time', this.config.segmentTime.toString(),  // 5 minutos
       '-segment_format', 'mp4',
-      '-segment_format_options', 'movflags=+faststart',
+      // NO usamos movflags=+faststart aquí - causa buffering de todo el segmento
+      // El moov atom queda al final, pero es aceptable para grabaciones
       '-reset_timestamps', '1',
       '-strftime', '1',
       
-      // Robustez
+      // ===== ROBUSTEZ CON LÍMITES DE MEMORIA =====
       '-avoid_negative_ts', 'make_zero',
-      '-max_muxing_queue_size', '9999',
-      '-reconnect', '1',               // Reconexión a nivel de input
+      '-max_muxing_queue_size', this.config.maxMuxingQueue.toString(),  // 512 (antes 9999)
+      '-reconnect', '1',
       '-reconnect_streamed', '1',
       '-reconnect_delay_max', '5',
+      
+      // ===== FLUSH FRECUENTE A DISCO =====
+      '-flush_packets', '1',  // Escribir paquetes inmediatamente
       
       outputPattern
     ]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
 import { useMQTT } from '../contexts/MQTTContext'
 import { useScenario } from '../contexts/ScenarioContext'
@@ -98,17 +98,54 @@ const DashboardSummary = () => {
 
   const [recordingState, setRecordingState] = useState('idle')
   const [elapsedTime, setElapsedTime] = useState(0)
+  
+  // Referencia para el tiempo de inicio de grabación (para cálculo preciso)
+  const recordingStartTime = useRef(null)
 
-  // Timer para grabación
+  /**
+   * Calcula el tiempo transcurrido basándose en el timestamp de inicio
+   * Inmune al throttling del navegador en segundo plano
+   */
+  const calculateElapsedTime = useCallback(() => {
+    // Primero intentar obtener del contexto de recording
+    const syncedElapsed = getMaxElapsedSeconds()
+    if (syncedElapsed > 0) {
+      return syncedElapsed
+    }
+    
+    // Fallback al cálculo local
+    if (!recordingStartTime.current) return 0
+    return Math.max(0, Math.floor((Date.now() - recordingStartTime.current) / 1000))
+  }, [getMaxElapsedSeconds])
+
+  // Timer para grabación - ahora usa cálculo basado en timestamp
   useEffect(() => {
     let interval
     if (recordingState === 'recording') {
       interval = setInterval(() => {
-        setElapsedTime(prev => prev + 1)
+        setElapsedTime(calculateElapsedTime())
       }, 1000)
+      
+      // Actualizar inmediatamente
+      setElapsedTime(calculateElapsedTime())
     }
     return () => clearInterval(interval)
-  }, [recordingState])
+  }, [recordingState, calculateElapsedTime])
+
+  /**
+   * Sincroniza el tiempo cuando la página vuelve a ser visible
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && recordingState === 'recording') {
+        console.log('[DashboardSummary] Página visible, actualizando contador...')
+        setElapsedTime(calculateElapsedTime())
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [recordingState, calculateElapsedTime])
 
   // Sync con recording context - incluye sincronización del timer desde backend
   useEffect(() => {
@@ -117,26 +154,43 @@ const DashboardSummary = () => {
       // Sincronizar tiempo transcurrido desde el backend
       if (initialSyncDone) {
         const syncedElapsed = getMaxElapsedSeconds()
+        const oldestStart = getOldestStartTime()
+        
+        if (oldestStart) {
+          recordingStartTime.current = new Date(oldestStart).getTime()
+        } else {
+          recordingStartTime.current = Date.now()
+        }
+        
         if (syncedElapsed > 0) {
           setElapsedTime(syncedElapsed)
+        } else {
+          setElapsedTime(calculateElapsedTime())
         }
       }
     } else if (activeRecordingsCount === 0 && recordingState === 'recording') {
       setRecordingState('idle')
+      recordingStartTime.current = null
       setElapsedTime(0)
     }
-  }, [activeRecordingsCount, recordingState, initialSyncDone])
+  }, [activeRecordingsCount, recordingState, initialSyncDone, getMaxElapsedSeconds, getOldestStartTime, calculateElapsedTime])
 
   // Sincronización inicial del timer cuando se completa el sync con backend
   useEffect(() => {
-    if (initialSyncDone && activeRecordingsCount > 0 && elapsedTime === 0) {
+    if (initialSyncDone && activeRecordingsCount > 0) {
       const syncedElapsed = getMaxElapsedSeconds()
+      const oldestStart = getOldestStartTime()
+      
+      if (oldestStart) {
+        recordingStartTime.current = new Date(oldestStart).getTime()
+      }
+      
       if (syncedElapsed > 0) {
         console.log('[DashboardSummary] Sincronizando timer desde backend:', syncedElapsed, 'segundos')
         setElapsedTime(syncedElapsed)
       }
     }
-  }, [initialSyncDone])
+  }, [initialSyncDone, activeRecordingsCount, getMaxElapsedSeconds, getOldestStartTime])
 
   // Verificar estado de cámara
   const checkCameraStatus = async (cameraId) => {
