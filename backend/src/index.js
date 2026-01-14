@@ -16,9 +16,11 @@ import replicationRoutes from './routes/replication.js'
 import emqxRoutes from './routes/emqx.js'
 import storageRoutes from './routes/storage.js'
 import recordingsRoutes from './routes/recordings.js'
+import processingRoutes from './routes/processing.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
 import recordingManager from './services/recordingManager.js'
+import videoProcessor from './services/videoProcessor.js'
 import mqttService from './services/mqttService.js'
 import replicationService from './services/replicationService.js'
 import storageManager from './services/storageManager.js'
@@ -132,6 +134,37 @@ recordingManager.on('recordingAbandoned', (data) => {
     ...data,
     timestamp: new Date().toISOString()
   }).catch(err => console.error('Error publicando abandono grabación:', err))
+})
+
+// Escuchar eventos de VideoProcessor
+videoProcessor.on('taskCompleted', (task) => {
+  console.log(`✅ Tarea completada: ${task.type} - ${task.id}`)
+  mqttService.publish('camera_rtsp/processing/completed', {
+    taskId: task.id,
+    type: task.type,
+    result: task.result,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando tarea completada:', err))
+})
+
+videoProcessor.on('taskFailed', (task) => {
+  console.log(`❌ Tarea fallida: ${task.type} - ${task.error}`)
+  mqttService.publish('camera_rtsp/processing/failed', {
+    taskId: task.id,
+    type: task.type,
+    error: task.error,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando tarea fallida:', err))
+})
+
+videoProcessor.on('compressionProgress', (data) => {
+  // Solo publicar cada 10% para no saturar
+  if (data.progress % 10 === 0) {
+    mqttService.publish('camera_rtsp/processing/progress', {
+      ...data,
+      timestamp: new Date().toISOString()
+    }).catch(err => {})
+  }
 })
 
 // Escuchar eventos de almacenamiento
@@ -313,6 +346,11 @@ app.use('/api/replication', replicationRoutes)
 app.use('/api/emqx', emqxRoutes)
 app.use('/api/storage', storageRoutes)
 app.use('/api/recordings', recordingsRoutes)
+app.use('/api/processing', processingRoutes)
+
+// Servir archivos estáticos de thumbnails y clips
+app.use('/thumbnails', express.static(path.join(process.cwd(), 'thumbnails')))
+app.use('/clips', express.static(path.join(process.cwd(), 'clips')))
 
 // Ruta de health check
 app.get('/health', (req, res) => {

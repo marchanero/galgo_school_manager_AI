@@ -231,6 +231,109 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/is-recording`)
     if (!response.ok) throw new Error('Error al verificar grabación')
     return response.json()
+  },
+
+  // Post-procesamiento de Video
+  async getProcessingStatus() {
+    const response = await fetch(`${API_BASE_URL}/processing/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de procesamiento')
+    return response.json()
+  },
+
+  async getProcessingConfig() {
+    const response = await fetch(`${API_BASE_URL}/processing/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración')
+    return response.json()
+  },
+
+  async updateProcessingConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/processing/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async generateThumbnail(data) {
+    const response = await fetch(`${API_BASE_URL}/processing/thumbnail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnail')
+    return response.json()
+  },
+
+  async generateBatchThumbnails(options = {}) {
+    const response = await fetch(`${API_BASE_URL}/processing/thumbnails/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnails')
+    return response.json()
+  },
+
+  async getProcessingThumbnails() {
+    const response = await fetch(`${API_BASE_URL}/processing/thumbnails`)
+    if (!response.ok) throw new Error('Error al obtener thumbnails')
+    return response.json()
+  },
+
+  async compressVideo(data) {
+    const response = await fetch(`${API_BASE_URL}/processing/compress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al comprimir video')
+    return response.json()
+  },
+
+  async compressOldVideos(options = {}) {
+    const response = await fetch(`${API_BASE_URL}/processing/compress/old`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    })
+    if (!response.ok) throw new Error('Error al comprimir videos antiguos')
+    return response.json()
+  },
+
+  async extractClip(data) {
+    const response = await fetch(`${API_BASE_URL}/processing/clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al extraer clip')
+    return response.json()
+  },
+
+  async getProcessingClips() {
+    const response = await fetch(`${API_BASE_URL}/processing/clips`)
+    if (!response.ok) throw new Error('Error al obtener clips')
+    return response.json()
+  },
+
+  async getVideoInfo(videoPath) {
+    const response = await fetch(`${API_BASE_URL}/processing/video-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoPath })
+    })
+    if (!response.ok) throw new Error('Error al obtener info de video')
+    return response.json()
+  },
+
+  async cancelProcessingTask(taskId) {
+    const response = await fetch(`${API_BASE_URL}/processing/task/${taskId}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al cancelar tarea')
+    return response.json()
   }
 }
 
