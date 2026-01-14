@@ -283,6 +283,21 @@ function AppContent() {
     localStorage.setItem('configSubTab', configSubTab)
   }, [configSubTab])
 
+  // Listener para navegación desde acciones rápidas del dashboard
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NAVIGATE_TAB') {
+        setActiveTab(event.data.tab)
+      } else if (event.data?.type === 'NAVIGATE_CONFIG') {
+        setActiveTab('config')
+        setConfigSubTab(event.data.subTab)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
   // Advertir al usuario si hay grabaciones activas antes de cerrar/recargar
   useEffect(() => {
     const handleBeforeUnload = (e) => {

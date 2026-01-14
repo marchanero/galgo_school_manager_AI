@@ -1186,8 +1186,8 @@ const DashboardSummary = () => {
               Acciones Rápidas
             </h4>
             <div className="space-y-2">
-              <button 
-                onClick={() => window.location.hash = '#camaras'}
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_TAB', tab: 'cameras' }, '*')}
                 className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="flex items-center gap-2">
@@ -1196,13 +1196,64 @@ const DashboardSummary = () => {
                 </span>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </button>
-              <button 
-                onClick={() => window.location.hash = '#escenarios'}
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'scenarios' }, '*')}
                 className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="flex items-center gap-2">
                   <Theater className="w-4 h-4 text-purple-500" />
                   Gestionar Escenarios
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'recordings' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Film className="w-4 h-4 text-red-500" />
+                  Ver Grabaciones
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'storage' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-orange-500" />
+                  Estado de Almacenamiento
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'performance' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-emerald-500" />
+                  Rendimiento del Sistema
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/recordings/memory-config')
+                    const data = await response.json()
+                    if (data.success) {
+                      const config = data.memoryOptimizations
+                      toast.success(`Configuración de memoria: Segmentos ${config.segmentTime}, Buffer ${config.inputBufferSize}`)
+                    }
+                  } catch (error) {
+                    toast.error('Error obteniendo configuración de memoria')
+                  }
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-cyan-500" />
+                  Ver Config Memoria
                 </span>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </button>
