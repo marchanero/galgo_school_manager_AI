@@ -4,14 +4,46 @@ Una aplicación web moderna para visualizar streams de cámaras RTSP usando **Re
 
 ## 🚀 Características
 
+### Core Features
 - ✅ Frontend moderno con React 18 y Vite
 - ✅ Backend API REST con Express.js
 - ✅ Base de datos SQLite con Prisma ORM
 - ✅ Gestión completa de cámaras RTSP
 - ✅ Interfaz responsive y moderna
-- ✅ Stream de video en tiempo real
-- ✅ Control de reproducción (play/pause)
+- ✅ Stream de video en tiempo real (WebRTC y HLS)
+- ✅ Control de reproducción en tiempo real
 - ✅ Información en tiempo real de cámaras
+
+### 🎬 Video Recording Optimization System (NEW!)
+
+Sistema completo de optimización de grabaciones de video con 4 fases integradas:
+
+#### Phase 1: Storage Management ✅
+- **Monitoreo Automático**: Seguimiento continuo del espacio en disco
+- **Limpieza Inteligente**: Eliminación automática de grabaciones antiguas
+- **Alertas de Almacenamiento**: Notificaciones MQTT para espacio bajo
+- **Políticas de Retención**: Configuración por escenario
+
+#### Phase 2: Resilient Recording ✅
+- **Auto-Reconexión**: Reconexión automática con backoff exponencial
+- **Monitoreo de Salud**: Verificaciones continuas de procesos
+- **Cierre Graceful**: Limpieza adecuada en apagado del sistema
+- **Eventos MQTT**: Actualizaciones en tiempo real
+
+#### Phase 3: Post-Processing ✅
+- **Generación de Thumbnails**: Creación automática de miniaturas
+- **Compresión de Video**: Compresión acelerada por hardware
+- **Extracción de Clips**: Extracción basada en tiempo
+- **Sistema de Colas**: Procesamiento por lotes eficiente
+
+#### Phase 4: Performance Optimization ✅
+- **Detección de Hardware**: Detección automática de encoders GPU
+- **Frame Caching**: Sistema de caché inteligente con TTL
+- **Perfiles Adaptativos**: Cambio dinámico según rendimiento
+- **Monitoreo de Rendimiento**: Métricas en tiempo real
+
+📖 **Documentación completa**: Ver [VIDEO_RECORDING_OPTIMIZATION.md](docs/VIDEO_RECORDING_OPTIMIZATION.md)  
+🚀 **Guía rápida**: Ver [QUICK_START_VIDEO_OPTIMIZATION.md](docs/QUICK_START_VIDEO_OPTIMIZATION.md)
 
 ## 📋 Requisitos Previos
 
