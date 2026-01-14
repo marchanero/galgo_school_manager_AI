@@ -5,6 +5,7 @@ import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
 import CameraThumbnail from './CameraThumbnail'
 import LiveStreamThumbnail from './LiveStreamThumbnail'
+import ConfirmModal from './ConfirmModal'
 import { toast } from 'react-hot-toast'
 import { 
   Video, 
@@ -45,6 +46,8 @@ const DashboardSummary = () => {
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('dashboardViewMode') || 'thumbnail'
   })
+  // Modal de confirmación para detener grabación
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stats, setStats] = useState({
     totalCameras: 0,
     activeCameras: 0,
@@ -345,10 +348,18 @@ const DashboardSummary = () => {
     setRecordingState('recording')
   }
 
-  const handleStopRecording = async () => {
+  // Mostrar modal de confirmación antes de detener
+  const handleStopRecordingClick = () => {
+    setShowStopConfirm(true)
+  }
+
+  // Confirmar detención de grabación
+  const handleConfirmStopRecording = async () => {
     await stopAllRecordings()
     setRecordingState('idle')
     setElapsedTime(0)
+    setShowStopConfirm(false)
+    toast.success('Grabación detenida correctamente')
   }
 
   const handleDeleteRecording = async (filename) => {
@@ -544,7 +555,7 @@ const DashboardSummary = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
-                    onClick={recordingState === 'recording' ? handleStopRecording : handleStartRecording}
+                    onClick={recordingState === 'recording' ? handleStopRecordingClick : handleStartRecording}
                     disabled={cameras.length === 0}
                     className={`flex items-center justify-center w-14 h-14 rounded-full transition-all transform hover:scale-105 active:scale-95 ${
                       recordingState === 'recording'
@@ -1124,6 +1135,18 @@ const DashboardSummary = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación para detener grabación */}
+      <ConfirmModal
+        isOpen={showStopConfirm}
+        onClose={() => setShowStopConfirm(false)}
+        onConfirm={handleConfirmStopRecording}
+        title="Detener Grabación"
+        message={`¿Estás seguro de que deseas detener la grabación? Se están grabando ${activeRecordingsCount} cámara${activeRecordingsCount !== 1 ? 's' : ''} y datos de sensores. La grabación actual de ${formatTime(elapsedTime)} se guardará.`}
+        confirmText="Sí, detener"
+        cancelText="Continuar grabando"
+        isDanger={true}
+      />
     </div>
   )
 }

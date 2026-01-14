@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '../services/api'
+import ConfirmModal from './ConfirmModal'
+import { toast } from 'react-hot-toast'
 import {
   Play,
   Square,
@@ -26,6 +28,9 @@ export default function RecordingDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [showConfig, setShowConfig] = useState(false)
   const [editConfig, setEditConfig] = useState({})
+  // Estado para confirmación de detener grabación
+  const [confirmStop, setConfirmStop] = useState({ isOpen: false, cameraId: null, cameraName: '' })
+  const [confirmStopAll, setConfirmStopAll] = useState(false)
 
   // Cargar datos
   const loadData = useCallback(async () => {
@@ -68,23 +73,39 @@ export default function RecordingDashboard() {
     }
   }
 
-  // Detener grabación
-  const stopRecording = async (cameraId) => {
+  // Solicitar confirmación para detener grabación individual
+  const requestStopRecording = (cameraId, cameraName) => {
+    setConfirmStop({ isOpen: true, cameraId, cameraName })
+  }
+
+  // Confirmar y detener grabación individual
+  const confirmStopRecording = async () => {
     try {
-      await api.stopRecording(cameraId)
+      await api.stopRecording(confirmStop.cameraId)
+      toast.success(`Grabación de "${confirmStop.cameraName}" detenida`)
+      setConfirmStop({ isOpen: false, cameraId: null, cameraName: '' })
       loadData()
     } catch (error) {
       console.error('Error deteniendo grabación:', error)
+      toast.error('Error al detener grabación')
     }
   }
 
-  // Detener todas
-  const stopAll = async () => {
+  // Solicitar confirmación para detener todas
+  const requestStopAll = () => {
+    setConfirmStopAll(true)
+  }
+
+  // Confirmar y detener todas las grabaciones
+  const confirmStopAllRecordings = async () => {
     try {
       await api.stopAllRecordings()
+      toast.success('Todas las grabaciones detenidas')
+      setConfirmStopAll(false)
       loadData()
     } catch (error) {
       console.error('Error deteniendo grabaciones:', error)
+      toast.error('Error al detener grabaciones')
     }
   }
 
@@ -160,7 +181,7 @@ export default function RecordingDashboard() {
           
           {recordings.length > 0 && (
             <button
-              onClick={stopAll}
+              onClick={requestStopAll}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2"
             >
               <Square className="h-5 w-5" />
@@ -234,7 +255,7 @@ export default function RecordingDashboard() {
                     </div>
                     
                     <button
-                      onClick={() => stopRecording(recording.cameraId)}
+                      onClick={() => requestStopRecording(recording.cameraId, recording.cameraName)}
                       className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                       title="Detener grabación"
                     >
@@ -453,6 +474,30 @@ export default function RecordingDashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal de confirmación para detener grabación individual */}
+      <ConfirmModal
+        isOpen={confirmStop.isOpen}
+        onClose={() => setConfirmStop({ isOpen: false, cameraId: null, cameraName: '' })}
+        onConfirm={confirmStopRecording}
+        title="Detener Grabación"
+        message={`¿Estás seguro de que deseas detener la grabación de "${confirmStop.cameraName}"? El archivo se guardará automáticamente.`}
+        confirmText="Sí, detener"
+        cancelText="Cancelar"
+        isDanger={true}
+      />
+
+      {/* Modal de confirmación para detener todas las grabaciones */}
+      <ConfirmModal
+        isOpen={confirmStopAll}
+        onClose={() => setConfirmStopAll(false)}
+        onConfirm={confirmStopAllRecordings}
+        title="Detener Todas las Grabaciones"
+        message={`¿Estás seguro de que deseas detener todas las grabaciones (${recordings.length} activas)? Todos los archivos se guardarán automáticamente.`}
+        confirmText="Sí, detener todas"
+        cancelText="Cancelar"
+        isDanger={true}
+      />
     </div>
   )
 }
