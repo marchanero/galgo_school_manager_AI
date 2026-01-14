@@ -22,6 +22,7 @@ export function RecordingProvider({ children }) {
   })
   
   const [globalRecordingStatus, setGlobalRecordingStatus] = useState('idle') // 'idle', 'starting', 'recording', 'stopping'
+  const [initialSyncDone, setInitialSyncDone] = useState(false)
 
   // Persistir estado de grabación en localStorage
   useEffect(() => {
@@ -33,6 +34,76 @@ export function RecordingProvider({ children }) {
       console.error('Error guardando estado de grabación:', error)
     }
   }, [recordings])
+
+  /**
+   * Sincroniza el estado inicial desde el backend al cargar la página
+   * Verifica qué grabaciones siguen activas realmente en el servidor
+   */
+  useEffect(() => {
+    const syncInitialState = async () => {
+      try {
+        console.log('🔄 Sincronizando estado de grabaciones con backend...')
+        
+        // Obtener estado global del sistema de grabación
+        const response = await fetch('/api/media/status')
+        const backendStatus = await response.json()
+        
+        console.log('📊 Estado del backend:', backendStatus)
+        
+        // Las grabaciones activas en el backend (ej: ['camera_1', 'camera_2'])
+        const activeBackendRecordings = new Set(
+          (backendStatus.recording || []).map(key => {
+            // Extraer el ID de la cámara de 'camera_X'
+            const match = key.match(/camera_(\d+)/)
+            return match ? parseInt(match[1]) : null
+          }).filter(id => id !== null)
+        )
+        
+        console.log('🎬 Grabaciones activas en backend:', Array.from(activeBackendRecordings))
+        
+        // Actualizar el estado local basándose en el backend
+        setRecordings(prev => {
+          const updated = new Map()
+          
+          // Mantener solo las grabaciones que el backend confirma como activas
+          for (const [cameraId, recordingInfo] of prev.entries()) {
+            if (activeBackendRecordings.has(cameraId)) {
+              updated.set(cameraId, {
+                ...recordingInfo,
+                status: 'recording'
+              })
+              console.log(`✅ Grabación ${cameraId} confirmada activa`)
+            } else {
+              console.log(`🗑️ Grabación ${cameraId} ya no está activa, removiendo del estado`)
+            }
+          }
+          
+          // Si hay grabaciones en backend que no tenemos en el estado local, agregarlas
+          for (const cameraId of activeBackendRecordings) {
+            if (!updated.has(cameraId)) {
+              console.log(`➕ Agregando grabación ${cameraId} que estaba activa en backend`)
+              updated.set(cameraId, {
+                status: 'recording',
+                cameraName: `Cámara ${cameraId}`, // Nombre por defecto
+                startedAt: new Date() // Aproximado
+              })
+            }
+          }
+          
+          return updated
+        })
+        
+        setInitialSyncDone(true)
+        console.log('✅ Sincronización inicial completada')
+        
+      } catch (error) {
+        console.error('❌ Error sincronizando estado inicial:', error)
+        setInitialSyncDone(true) // Marcar como hecho aunque falle, para no bloquear
+      }
+    }
+    
+    syncInitialState()
+  }, []) // Solo al montar
 
   /**
    * Sincroniza el estado de grabación desde el backend
@@ -284,6 +355,7 @@ export function RecordingProvider({ children }) {
     // Estado
     recordings,
     globalRecordingStatus,
+    initialSyncDone,
     
     // Acciones individuales
     startRecording,
