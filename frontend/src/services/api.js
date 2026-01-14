@@ -61,6 +61,29 @@ export const api = {
     return response.json()
   },
 
+  // Media Server Status
+  async getMediaStatus() {
+    const response = await fetch(`${API_BASE_URL}/media/status`)
+    if (!response.ok) throw new Error('Error al obtener estado del servidor de medios')
+    return response.json()
+  },
+
+  async stopMediaRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/media/stop/${cameraId}`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabación')
+    return response.json()
+  },
+
+  async stopAllMediaRecordings() {
+    const response = await fetch(`${API_BASE_URL}/media/stop-all`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabaciones')
+    return response.json()
+  },
+
   // Replicación
   async getReplicationStats() {
     const response = await fetch(`${API_BASE_URL}/replication/stats`)

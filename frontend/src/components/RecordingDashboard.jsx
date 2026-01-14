@@ -32,16 +32,41 @@ export default function RecordingDashboard() {
   const [confirmStop, setConfirmStop] = useState({ isOpen: false, cameraId: null, cameraName: '' })
   const [confirmStopAll, setConfirmStopAll] = useState(false)
 
-  // Cargar datos
+  // Cargar datos - combina grabaciones de recordingManager y mediaServer
   const loadData = useCallback(async () => {
     try {
-      const [statusRes, camerasRes] = await Promise.all([
-        api.getRecordingsStatus(),
+      const [statusRes, mediaRes, camerasRes] = await Promise.all([
+        api.getRecordingsStatus().catch(() => ({ data: { recordings: [], config: {} } })),
+        api.getMediaStatus().catch(() => ({ recording: [], recordingDetails: [] })),
         api.getCameras()
       ])
       
-      setRecordings(statusRes.data.recordings || [])
-      setConfig(statusRes.data.config || {})
+      // Grabaciones del recordingManager
+      const recordingManagerRecs = statusRes.data?.recordings || []
+      
+      // Grabaciones del mediaServer (convertir al mismo formato)
+      const mediaServerRecs = (mediaRes.recordingDetails || []).map(detail => ({
+        cameraId: detail.cameraId,
+        cameraName: detail.cameraName || `Cámara ${detail.cameraId}`,
+        status: 'recording',
+        startedAt: detail.startTime,
+        elapsedSeconds: detail.elapsedSeconds || 0,
+        scenarioName: detail.scenarioName,
+        source: 'mediaServer',
+        lastActivity: Date.now(),
+        bytesWritten: 0,
+        reconnectAttempts: 0
+      }))
+      
+      // Combinar sin duplicados (priorizar mediaServer)
+      const mediaServerIds = new Set(mediaServerRecs.map(r => r.cameraId))
+      const combined = [
+        ...mediaServerRecs,
+        ...recordingManagerRecs.filter(r => !mediaServerIds.has(r.cameraId))
+      ]
+      
+      setRecordings(combined)
+      setConfig(statusRes.data?.config || {})
       setCameras(camerasRes.data || [])
       setIsLoading(false)
     } catch (error) {
@@ -74,16 +99,22 @@ export default function RecordingDashboard() {
   }
 
   // Solicitar confirmación para detener grabación individual
-  const requestStopRecording = (cameraId, cameraName) => {
-    setConfirmStop({ isOpen: true, cameraId, cameraName })
+  const requestStopRecording = (cameraId, cameraName, source) => {
+    setConfirmStop({ isOpen: true, cameraId, cameraName, source })
   }
 
   // Confirmar y detener grabación individual
   const confirmStopRecording = async () => {
     try {
-      await api.stopRecording(confirmStop.cameraId)
+      // Intentar detener en ambos sistemas para asegurar que se detiene
+      const stopPromises = [
+        api.stopRecording(confirmStop.cameraId).catch(() => {}),
+        api.stopMediaRecording(confirmStop.cameraId).catch(() => {})
+      ]
+      await Promise.all(stopPromises)
+      
       toast.success(`Grabación de "${confirmStop.cameraName}" detenida`)
-      setConfirmStop({ isOpen: false, cameraId: null, cameraName: '' })
+      setConfirmStop({ isOpen: false, cameraId: null, cameraName: '', source: null })
       loadData()
     } catch (error) {
       console.error('Error deteniendo grabación:', error)
@@ -99,7 +130,11 @@ export default function RecordingDashboard() {
   // Confirmar y detener todas las grabaciones
   const confirmStopAllRecordings = async () => {
     try {
-      await api.stopAllRecordings()
+      // Detener en ambos sistemas
+      await Promise.all([
+        api.stopAllRecordings().catch(() => {}),
+        api.stopAllMediaRecordings().catch(() => {})
+      ])
       toast.success('Todas las grabaciones detenidas')
       setConfirmStopAll(false)
       loadData()
