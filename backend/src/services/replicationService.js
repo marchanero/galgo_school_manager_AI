@@ -1,8 +1,12 @@
-import { spawn } from 'child_process'
+import { spawn, exec as execCallback } from 'child_process'
+import { promisify } from 'util'
 import path from 'path'
 import fs from 'fs'
+import crypto from 'crypto'
 import cron from 'node-cron'
 import { replication as replicationConfig } from '../config.js'
+
+const exec = promisify(execCallback)
 
 class ReplicationService {
   constructor() {
@@ -15,22 +19,390 @@ class ReplicationService {
     this.retentionDays = 0 // 0 = no borrar nunca
     this.deleteAfterExport = false
     this.lastSyncTime = null
+    this.transferStats = {
+      totalTransferred: 0,
+      successCount: 0,
+      failCount: 0,
+      lastError: null
+    }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FUNCIONES DE HASH Y VERIFICACIÓN DE INTEGRIDAD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Calcula hash SHA256 de un archivo local
+   */
+  async calculateFileHash(filePath) {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256')
+      const stream = fs.createReadStream(filePath)
+      
+      stream.on('error', reject)
+      stream.on('data', chunk => hash.update(chunk))
+      stream.on('end', () => resolve(hash.digest('hex')))
+    })
+  }
+
+  /**
+   * Obtiene hash SHA256 de archivo remoto via SSH
+   */
+  async getRemoteFileHash(remotePath) {
+    const { host, user, port, sshKeyPath } = replicationConfig
+    const sshTarget = `${user}@${host}`
+    
+    const sshArgs = ['-p', port.toString(), '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=30']
+    if (sshKeyPath) sshArgs.push('-i', sshKeyPath)
+    
+    const cmd = `ssh ${sshArgs.join(' ')} ${sshTarget} "sha256sum '${remotePath}'" 2>/dev/null`
+    
+    try {
+      const { stdout } = await exec(cmd)
+      const hash = stdout.trim().split(/\s+/)[0]
+      return hash
+    } catch (error) {
+      console.error(`❌ Error obteniendo hash remoto: ${error.message}`)
+      return null
+    }
+  }
+
+  /**
+   * Verifica integridad de archivo comparando hashes local y remoto
+   */
+  async verifyFileIntegrity(localPath, remotePath) {
+    try {
+      const localHash = await this.calculateFileHash(localPath)
+      const remoteHash = await this.getRemoteFileHash(remotePath)
+      
+      if (!remoteHash) {
+        return { verified: false, error: 'No se pudo obtener hash remoto' }
+      }
+      
+      const match = localHash === remoteHash
+      return { 
+        verified: match, 
+        localHash, 
+        remoteHash,
+        error: match ? null : 'Hashes no coinciden'
+      }
+    } catch (error) {
+      return { verified: false, error: error.message }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FUNCIONES DE ESPACIO Y MONITOREO REMOTO
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Verifica espacio disponible en servidor remoto via SSH
+   */
+  async checkRemoteSpace() {
+    if (replicationConfig.useMock || !replicationConfig.host) {
+      return this.getMockRemoteSpace()
+    }
+
+    const { host, user, port, remotePath, sshKeyPath } = replicationConfig
+    const sshTarget = `${user}@${host}`
+    
+    const sshArgs = ['-p', port.toString(), '-o', 'StrictHostKeyChecking=no', '-o', 'ConnectTimeout=10']
+    if (sshKeyPath) sshArgs.push('-i', sshKeyPath)
+    
+    const cmd = `ssh ${sshArgs.join(' ')} ${sshTarget} "df -B1 '${remotePath}' --output=size,used,avail,pcent | tail -n 1"`
+    
+    try {
+      const { stdout } = await exec(cmd)
+      const parts = stdout.trim().split(/\s+/)
+      
+      const total = parseInt(parts[0], 10)
+      const used = parseInt(parts[1], 10)
+      const available = parseInt(parts[2], 10)
+      const usePercent = parseInt((parts[3] || '0').replace('%', ''), 10)
+      
+      return {
+        available: true,
+        total,
+        used,
+        free: available,
+        usePercent,
+        totalGB: Math.round(total / 1024 / 1024 / 1024),
+        usedGB: Math.round(used / 1024 / 1024 / 1024),
+        freeGB: Math.round(available / 1024 / 1024 / 1024),
+        canTransfer: usePercent < replicationConfig.remoteMaxUsePercent,
+        isCritical: usePercent >= replicationConfig.remoteCriticalPercent,
+        lastChecked: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error(`❌ Error verificando espacio remoto: ${error.message}`)
+      return { available: false, error: error.message, canTransfer: false }
+    }
+  }
+
+  getMockRemoteSpace() {
+    const totalTB = replicationConfig.mockCapacityTB || 6
+    const totalGB = totalTB * 1024
+    const usePercent = Math.floor(Math.random() * 30) + 10
+    const usedGB = Math.floor((totalGB * usePercent) / 100)
+    const freeGB = totalGB - usedGB
+    
+    return {
+      available: true,
+      isMock: true,
+      total: totalGB * 1024 * 1024 * 1024,
+      used: usedGB * 1024 * 1024 * 1024,
+      free: freeGB * 1024 * 1024 * 1024,
+      totalGB,
+      usedGB,
+      freeGB,
+      usePercent,
+      canTransfer: usePercent < replicationConfig.remoteMaxUsePercent,
+      isCritical: usePercent >= replicationConfig.remoteCriticalPercent,
+      lastChecked: new Date().toISOString()
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RCLONE: MOTOR DE TRANSFERENCIA PRINCIPAL
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Configura remote de rclone si no existe
+   */
+  async setupRcloneRemote() {
+    const { rcloneRemote, host, port, user, password, sshKeyPath } = replicationConfig
+    
+    try {
+      // Verificar si el remote ya existe
+      const { stdout } = await exec(`rclone listremotes 2>/dev/null`)
+      if (stdout.includes(`${rcloneRemote}:`)) {
+        console.log(`✅ Remote rclone '${rcloneRemote}' ya existe`)
+        return true
+      }
+      
+      // Crear remote SFTP
+      let createCmd = `rclone config create ${rcloneRemote} sftp host=${host} port=${port} user=${user}`
+      
+      if (password) {
+        // Obscurecer contraseña para rclone
+        const { stdout: obscured } = await exec(`rclone obscure "${password}"`)
+        createCmd += ` pass=${obscured.trim()}`
+      }
+      
+      if (sshKeyPath) {
+        createCmd += ` key_file=${sshKeyPath}`
+      }
+      
+      await exec(createCmd)
+      console.log(`✅ Remote rclone '${rcloneRemote}' creado exitosamente`)
+      return true
+    } catch (error) {
+      console.error(`❌ Error configurando rclone: ${error.message}`)
+      return false
+    }
+  }
+
+  /**
+   * Ejecuta transferencia con rclone
+   */
+  rcloneCopy(localPath, remotePath, options = {}) {
+    return new Promise((resolve, reject) => {
+      const { rcloneRemote, transfers, checkers, retries, retrySleep, timeout } = replicationConfig
+      
+      const args = [
+        'copy',
+        localPath,
+        `${rcloneRemote}:${remotePath}`,
+        '--checksum',
+        `--transfers=${options.transfers || transfers}`,
+        `--checkers=${options.checkers || checkers}`,
+        `--retries=${options.retries || retries}`,
+        `--retries-sleep=${options.retrySleep || retrySleep}s`,
+        `--timeout=${options.timeout || timeout}s`,
+        '--low-level-retries=20',
+        '--stats=30s',
+        '--stats-one-line',
+        '-v'
+      ]
+      
+      console.log(`🚀 Ejecutando: rclone ${args.slice(0, 4).join(' ')} ...`)
+      
+      const proc = spawn('rclone', args)
+      let stderr = ''
+      
+      proc.stdout.on('data', (data) => {
+        const line = data.toString().trim()
+        if (line.includes('Transferred:') || line.includes('Errors:')) {
+          console.log(`[rclone] ${line}`)
+        }
+      })
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString()
+        const line = data.toString().trim()
+        if (!line.includes('DEBUG') && line.length > 0) {
+          console.log(`[rclone] ${line}`)
+        }
+      })
+      
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true })
+        } else {
+          reject(new Error(`rclone terminó con código ${code}: ${stderr.slice(-500)}`))
+        }
+      })
+      
+      proc.on('error', (error) => reject(error))
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // BACKOFF EXPONENCIAL Y REINTENTOS INTELIGENTES
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Ejecuta transferencia con reintentos y backoff exponencial
+   */
+  async transferWithRetry(localPath, remotePath, maxRetries = null) {
+    const retries = maxRetries || replicationConfig.retries
+    const { backoffBase, backoffMax, verifyHash } = replicationConfig
+    
+    let attempt = 0
+    let lastError = null
+    
+    while (attempt < retries) {
+      attempt++
+      
+      try {
+        // 1. Verificar espacio antes de transferir
+        const spaceCheck = await this.checkRemoteSpace()
+        if (!spaceCheck.canTransfer) {
+          throw new Error(`Espacio insuficiente en servidor remoto (${spaceCheck.usePercent}% usado)`)
+        }
+        
+        // 2. Ejecutar transferencia
+        if (replicationConfig.engine === 'rclone') {
+          await this.rcloneCopy(localPath, remotePath)
+        } else {
+          await this.rsyncCopy(localPath, remotePath)
+        }
+        
+        // 3. Verificar integridad si está habilitado
+        if (verifyHash && fs.statSync(localPath).isFile()) {
+          const fileName = path.basename(localPath)
+          const fullRemotePath = path.join(remotePath, fileName)
+          const verification = await this.verifyFileIntegrity(localPath, fullRemotePath)
+          
+          if (!verification.verified) {
+            throw new Error(`Verificación de hash falló: ${verification.error}`)
+          }
+          console.log(`✅ Verificación SHA256 correcta para ${fileName}`)
+        }
+        
+        // Éxito
+        this.transferStats.successCount++
+        return { 
+          success: true, 
+          attempts: attempt,
+          message: `Transferencia completada en intento ${attempt}`
+        }
+        
+      } catch (error) {
+        lastError = error
+        this.transferStats.lastError = error.message
+        
+        if (attempt >= retries) {
+          this.transferStats.failCount++
+          throw error
+        }
+        
+        // Calcular delay con backoff exponencial
+        const delay = Math.min(Math.pow(backoffBase, attempt), backoffMax) * 1000
+        console.log(`⚠️ Intento ${attempt}/${retries} falló: ${error.message}`)
+        console.log(`⏳ Reintentando en ${delay / 1000}s...`)
+        
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+    
+    throw lastError
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RSYNC: MOTOR ALTERNATIVO
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  rsyncCopy(localPath, remotePath) {
+    return new Promise((resolve, reject) => {
+      const { host, user, port, sshKeyPath } = replicationConfig
+      
+      const sshCmd = sshKeyPath 
+        ? `ssh -p ${port} -i ${sshKeyPath} -o StrictHostKeyChecking=no`
+        : `ssh -p ${port} -o StrictHostKeyChecking=no`
+      
+      const args = [
+        '-avz',
+        '--partial',
+        '--inplace',
+        '--compress-level=1',
+        '-e', sshCmd,
+        localPath.endsWith('/') ? localPath : localPath + '/',
+        `${user}@${host}:${remotePath}`
+      ]
+      
+      console.log(`🚀 Ejecutando: rsync ${args.slice(0, 3).join(' ')} ...`)
+      
+      const proc = spawn('rsync', args)
+      let stderr = ''
+      
+      proc.stdout.on('data', (data) => {
+        const line = data.toString().trim()
+        if (!line.includes('%') && line.length > 0) {
+          console.log(`[rsync] ${line}`)
+        }
+      })
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString()
+      })
+      
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve({ success: true })
+        } else {
+          reject(new Error(`rsync terminó con código ${code}: ${stderr.slice(-500)}`))
+        }
+      })
+      
+      proc.on('error', reject)
+    })
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INICIALIZACIÓN Y CONFIGURACIÓN
+  // ═══════════════════════════════════════════════════════════════════════════
 
   async init(prisma) {
     this.prisma = prisma
     await this.loadConfig()
     this.setupCron()
+    
+    // Configurar rclone remote si está habilitado
+    if (replicationConfig.enabled && replicationConfig.engine === 'rclone' && !replicationConfig.useMock) {
+      await this.setupRcloneRemote()
+    }
   }
 
   async loadConfig() {
     try {
-      const config = await this.prisma.systemConfig.findUnique({
+      // Cargar configuración de programación
+      const scheduleConfig = await this.prisma.systemConfig.findUnique({
         where: { key: 'replication_schedule' }
       })
 
-      if (config) {
-        const { schedule, enabled, retentionDays, deleteAfterExport, lastSyncTime } = JSON.parse(config.value)
+      if (scheduleConfig) {
+        const { schedule, enabled, retentionDays, deleteAfterExport, lastSyncTime } = JSON.parse(scheduleConfig.value)
         this.schedule = schedule || '0 3 * * *'
         this.enabled = enabled || false
         this.retentionDays = retentionDays || 0
@@ -41,8 +413,98 @@ class ReplicationService {
         // Crear configuración por defecto si no existe
         await this.saveConfig(this.schedule, this.enabled, this.retentionDays, this.deleteAfterExport)
       }
+
+      // Cargar configuración del servidor
+      const serverConfig = await this.prisma.systemConfig.findUnique({
+        where: { key: 'replication_server' }
+      })
+
+      if (serverConfig) {
+        const savedConfig = JSON.parse(serverConfig.value)
+        // Aplicar configuración guardada sobre la del .env
+        Object.assign(replicationConfig, savedConfig)
+        console.log(`🖥️ Configuración de servidor cargada: ${replicationConfig.useMock ? 'Mock' : replicationConfig.host} (Engine: ${replicationConfig.engine})`)
+      } else {
+        // Guardar configuración mock por defecto
+        await this.saveServerConfig({
+          useMock: true,
+          engine: 'rclone',
+          host: '',
+          port: 22,
+          user: '',
+          password: '',
+          sshKeyPath: '',
+          remotePath: '/mnt/backups/cameras',
+          rcloneRemote: 'truenas',
+          transfers: 4,
+          retries: 10,
+          verifyHash: true,
+          backoffBase: 2,
+          backoffMax: 300,
+          remoteMaxUsePercent: 90
+        })
+      }
     } catch (error) {
       console.error('Error cargando configuración de replicación:', error)
+    }
+  }
+
+  /**
+   * Guarda la configuración del servidor de backup en Prisma
+   */
+  async saveServerConfig(serverSettings) {
+    try {
+      const value = JSON.stringify(serverSettings)
+
+      await this.prisma.systemConfig.upsert({
+        where: { key: 'replication_server' },
+        update: { value },
+        create: {
+          key: 'replication_server',
+          value,
+          description: 'Configuración del servidor de backup remoto'
+        }
+      })
+
+      // Aplicar la nueva configuración
+      Object.assign(replicationConfig, serverSettings)
+      
+      console.log(`💾 Configuración de servidor guardada: ${serverSettings.useMock ? 'Mock' : serverSettings.host}`)
+      
+      // Reconfigurar rclone si es necesario
+      if (!serverSettings.useMock && serverSettings.engine === 'rclone' && serverSettings.host) {
+        await this.setupRcloneRemote()
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error guardando configuración de servidor:', error)
+      return false
+    }
+  }
+
+  /**
+   * Obtiene la configuración actual del servidor
+   */
+  getServerConfig() {
+    return {
+      useMock: replicationConfig.useMock,
+      engine: replicationConfig.engine,
+      host: replicationConfig.host,
+      port: replicationConfig.port,
+      user: replicationConfig.user,
+      // No devolver password por seguridad, solo indicar si está configurado
+      hasPassword: !!replicationConfig.password,
+      hasSshKey: !!replicationConfig.sshKeyPath,
+      sshKeyPath: replicationConfig.sshKeyPath,
+      remotePath: replicationConfig.remotePath,
+      rcloneRemote: replicationConfig.rcloneRemote,
+      transfers: replicationConfig.transfers,
+      retries: replicationConfig.retries,
+      verifyHash: replicationConfig.verifyHash,
+      backoffBase: replicationConfig.backoffBase,
+      backoffMax: replicationConfig.backoffMax,
+      remoteMaxUsePercent: replicationConfig.remoteMaxUsePercent
     }
   }
 
@@ -106,7 +568,8 @@ class ReplicationService {
   }
 
   /**
-   * Inicia la replicación de grabaciones al servidor remoto usando rsync
+   * Inicia la replicación de grabaciones al servidor remoto
+   * Usa rclone (recomendado) o rsync según configuración
    * @param {Object} options - Opciones de replicación
    * @param {boolean} options.force - Forzar replicación aunque haya una en curso
    */
@@ -116,79 +579,107 @@ class ReplicationService {
       return { success: false, message: 'Replicación en curso' }
     }
 
-    // Verificar si está habilitado en config.js (nivel sistema)
-    // La habilitación en DB es para el scheduler, pero config.js manda si no hay credenciales
-    if (!replicationConfig.host) {
+    // Verificar si está habilitado
+    if (!replicationConfig.host && !replicationConfig.useMock) {
       console.log('⚠️ Replicación no configurada (faltan credenciales)')
       return { success: false, message: 'Faltan credenciales de replicación' }
     }
 
+    // Mock mode para pruebas
+    if (replicationConfig.useMock) {
+      console.log('🔧 Modo MOCK: simulando replicación...')
+      await new Promise(r => setTimeout(r, 2000))
+      await this.updateLastSyncTime()
+      return { success: true, message: 'Replicación simulada (mock)', isMock: true }
+    }
+
     this.isReplicating = true
-    console.log('🔄 Iniciando replicación de videos...')
+    console.log(`🔄 Iniciando replicación con ${replicationConfig.engine}...`)
 
     try {
-      const { host, user, remotePath, sshKeyPath } = replicationConfig
-      const localPath = path.join(process.cwd(), 'recordings') + '/' // Trailing slash importante para rsync
-
-      // Construir comando rsync
-      // -a: archive mode (preserva permisos, tiempos, etc)
-      // -v: verbose
-      // -z: compress
-      // --delete: elimina archivos en destino que no existen en origen (opcional, configurable)
-      // -e: especifica shell remoto (ssh)
+      const { remotePath } = replicationConfig
+      const localPath = path.join(process.cwd(), 'recordings')
       
-      const rsyncArgs = [
-        '-avz',
-        // '--progress', // Comentado para no llenar logs en cron
-        localPath,
-        `${user}@${host}:${remotePath}`
-      ]
-
-      if (sshKeyPath) {
-        rsyncArgs.push('-e', `ssh -i ${sshKeyPath} -o StrictHostKeyChecking=no`)
+      // 1. Verificar espacio remoto antes de empezar
+      const spaceCheck = await this.checkRemoteSpace()
+      if (!spaceCheck.available) {
+        throw new Error(`No se puede conectar al servidor remoto: ${spaceCheck.error}`)
       }
+      if (spaceCheck.isCritical) {
+        throw new Error(`Espacio crítico en servidor remoto (${spaceCheck.usePercent}% usado)`)
+      }
+      if (!spaceCheck.canTransfer) {
+        console.log(`⚠️ Espacio limitado en remoto (${spaceCheck.usePercent}%), procediendo con precaución...`)
+      }
+      
+      console.log(`📊 Espacio remoto: ${spaceCheck.freeGB}GB libres (${spaceCheck.usePercent}% usado)`)
 
-      console.log('🚀 Ejecutando rsync:', 'rsync', rsyncArgs.join(' '))
-
-      await new Promise((resolve, reject) => {
-        const rsync = spawn('rsync', rsyncArgs)
-
-        rsync.stdout.on('data', (data) => {
-          // Solo loguear si no es progreso
-          const output = data.toString().trim()
-          if (!output.includes('%')) {
-             console.log(`[rsync] ${output}`)
-          }
-        })
-
-        rsync.stderr.on('data', (data) => {
-          console.error(`[rsync error] ${data.toString().trim()}`)
-        })
-
-        rsync.on('close', (code) => {
-          if (code === 0) {
-            resolve()
-          } else {
-            reject(new Error(`rsync terminó con código ${code}`))
-          }
-        })
-      })
-
-      console.log('✅ Replicación completada exitosamente')
+      // 2. Ejecutar transferencia con reintentos
+      const result = await this.transferWithRetry(localPath, remotePath)
+      
+      console.log(`✅ Replicación completada: ${result.message}`)
       await this.updateLastSyncTime()
 
-      // Limpieza de archivos antiguos si está habilitado
+      // 3. Limpieza de archivos antiguos si está habilitado
       if (this.deleteAfterExport && this.retentionDays > 0) {
         await this.cleanupOldFiles(localPath)
       }
 
       this.isReplicating = false
-      return { success: true, message: 'Replicación completada' }
+      return { 
+        success: true, 
+        message: 'Replicación completada',
+        attempts: result.attempts,
+        stats: this.transferStats
+      }
 
     } catch (error) {
-      console.error('❌ Error en replicación:', error)
+      console.error('❌ Error en replicación:', error.message)
       this.isReplicating = false
+      return { success: false, error: error.message, stats: this.transferStats }
+    }
+  }
+
+  /**
+   * Replica un archivo individual con verificación
+   */
+  async replicateFile(localFilePath, options = {}) {
+    if (!fs.existsSync(localFilePath)) {
+      return { success: false, error: 'Archivo no existe' }
+    }
+
+    const { remotePath } = replicationConfig
+    const relativePath = path.relative(path.join(process.cwd(), 'recordings'), localFilePath)
+    const remoteDir = path.join(remotePath, path.dirname(relativePath))
+    
+    try {
+      const result = await this.transferWithRetry(localFilePath, remoteDir, options.maxRetries)
+      return result
+    } catch (error) {
       return { success: false, error: error.message }
+    }
+  }
+
+  /**
+   * Obtiene estado detallado de la replicación
+   */
+  getStatus() {
+    return {
+      isReplicating: this.isReplicating,
+      enabled: this.enabled,
+      schedule: this.schedule,
+      lastSyncTime: this.lastSyncTime,
+      retentionDays: this.retentionDays,
+      deleteAfterExport: this.deleteAfterExport,
+      engine: replicationConfig.engine,
+      useMock: replicationConfig.useMock,
+      stats: this.transferStats,
+      config: {
+        host: replicationConfig.host ? `${replicationConfig.user}@${replicationConfig.host}` : null,
+        remotePath: replicationConfig.remotePath,
+        verifyHash: replicationConfig.verifyHash,
+        transfers: replicationConfig.transfers
+      }
     }
   }
 
@@ -233,6 +724,185 @@ class ReplicationService {
 
     walk(basePath)
     console.log(`✅ Limpieza completada. ${deletedCount} archivos eliminados.`)
+  }
+
+  /**
+   * Obtiene el estado completo del sistema de replicación
+   */
+  async getStatus() {
+    const stats = await this.getStats()
+    const remoteDiskInfo = await this.getRemoteDiskInfo()
+    const pendingFiles = await this.getPendingFilesCount()
+    
+    return {
+      // Estado general
+      enabled: this.enabled,
+      isReplicating: this.isReplicating,
+      schedule: this.schedule,
+      lastSyncTime: this.lastSyncTime,
+      
+      // Configuración del motor
+      engine: replicationConfig.engine,
+      useMock: replicationConfig.useMock,
+      verifyHash: replicationConfig.verifyHash,
+      
+      // Servidor remoto
+      remoteHost: replicationConfig.useMock ? 'mock-server' : replicationConfig.host,
+      remotePort: replicationConfig.port,
+      remotePath: replicationConfig.remotePath,
+      remoteStatus: remoteDiskInfo.available ? 'online' : 'offline',
+      
+      // Estadísticas locales
+      localFiles: stats.totalFiles,
+      localSize: stats.totalSize,
+      localSizeFormatted: this.formatBytes(stats.totalSize),
+      localDiskInfo: stats.localDiskInfo,
+      
+      // Estadísticas remotas
+      remoteDiskInfo,
+      
+      // Archivos pendientes
+      pendingFiles,
+      
+      // Configuración de políticas
+      retentionDays: this.retentionDays,
+      deleteAfterExport: this.deleteAfterExport,
+      
+      // Configuración de transferencia
+      transferConfig: {
+        engine: replicationConfig.engine,
+        transfers: replicationConfig.transfers,
+        retries: replicationConfig.retries,
+        verifyHash: replicationConfig.verifyHash,
+        backoffBase: replicationConfig.backoffBase,
+        backoffMax: replicationConfig.backoffMax
+      },
+      
+      // Última actividad
+      lastActivity: {
+        sync: this.lastSyncTime,
+        check: new Date().toISOString()
+      }
+    }
+  }
+
+  /**
+   * Prueba la conexión al servidor remoto
+   */
+  async testConnection() {
+    if (replicationConfig.useMock) {
+      // Simular prueba de conexión en modo mock
+      return {
+        success: true,
+        isMock: true,
+        message: 'Conexión simulada exitosa (modo mock)',
+        latencyMs: Math.floor(Math.random() * 50) + 10,
+        serverInfo: {
+          type: 'Mock TrueNAS Server',
+          version: 'TrueNAS-13.0-U6.1',
+          hostname: 'truenas-mock'
+        }
+      }
+    }
+    
+    const { host, port, user, sshKeyPath, password } = replicationConfig
+    
+    if (!host) {
+      return {
+        success: false,
+        error: 'Servidor remoto no configurado',
+        message: 'Configure REPLICATION_SSH_HOST en las variables de entorno'
+      }
+    }
+    
+    const startTime = Date.now()
+    
+    try {
+      // Probar conexión SSH
+      await new Promise((resolve, reject) => {
+        const sshArgs = [
+          '-o', 'StrictHostKeyChecking=no',
+          '-o', 'ConnectTimeout=10',
+          '-o', 'BatchMode=yes',
+          '-p', port.toString(),
+          ...(sshKeyPath ? ['-i', sshKeyPath] : []),
+          `${user}@${host}`,
+          'echo "connection_test"'
+        ]
+        
+        // Si hay password, usar sshpass
+        let cmd, args
+        if (password && !sshKeyPath) {
+          cmd = 'sshpass'
+          args = ['-p', password, 'ssh', ...sshArgs]
+        } else {
+          cmd = 'ssh'
+          args = sshArgs
+        }
+        
+        const ssh = spawn(cmd, args)
+        let output = ''
+        let stderr = ''
+        
+        ssh.stdout.on('data', (data) => { output += data.toString() })
+        ssh.stderr.on('data', (data) => { stderr += data.toString() })
+        
+        ssh.on('close', (code) => {
+          if (code === 0 && output.includes('connection_test')) {
+            resolve()
+          } else {
+            reject(new Error(stderr || `Exit code: ${code}`))
+          }
+        })
+        
+        ssh.on('error', (error) => reject(error))
+        
+        // Timeout de 15 segundos
+        setTimeout(() => {
+          ssh.kill()
+          reject(new Error('Connection timeout'))
+        }, 15000)
+      })
+      
+      const latencyMs = Date.now() - startTime
+      
+      // Obtener información del servidor
+      const spaceInfo = await this.checkRemoteSpace()
+      
+      return {
+        success: true,
+        isMock: false,
+        message: `Conexión exitosa a ${host}`,
+        latencyMs,
+        serverInfo: {
+          host,
+          port,
+          user,
+          totalSpace: `${spaceInfo.totalGB} GB`,
+          freeSpace: `${spaceInfo.freeGB} GB`,
+          usePercent: spaceInfo.usePercent
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        isMock: false,
+        error: error.message,
+        message: `Error conectando a ${host}: ${error.message}`,
+        latencyMs: Date.now() - startTime
+      }
+    }
+  }
+
+  /**
+   * Formatea bytes a formato legible
+   */
+  formatBytes(bytes) {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   async getStats() {
@@ -281,117 +951,53 @@ class ReplicationService {
   }
 
   async getRemoteDiskInfo() {
-    // Usar mock si está configurado o si no hay servidor remoto
-    if (replicationConfig.useMock || !replicationConfig.host) {
-      console.log('🔧 Usando datos mock para servidor remoto de replicación')
-      
-      const totalTB = replicationConfig.mockCapacityTB || 5
-      const totalGB = totalTB * 1024
-      const usedPercent = Math.floor(Math.random() * 30) + 10 // 10-40% usado
-      const usedGB = Math.floor((totalGB * usedPercent) / 100)
-      const availableGB = totalGB - usedGB
-      
-      return {
-        available: true,
-        filesystem: '/dev/sdb1',
-        mountPoint: '/mnt/remote-backups',
-        totalGB,
-        usedGB,
-        availableGB,
-        usePercent,
-        lastChecked: new Date().toISOString(),
-        isMock: true,
-        serverType: 'Mock Server',
-        description: `${totalTB}TB External Storage Server (Mock)`,
-        status: 'online',
-        connectionType: 'Mock Connection',
-        estimatedTransferSpeed: '100 MB/s',
-        lastReplicationSize: Math.floor(Math.random() * 500) + 100, // 100-600 GB
-        replicationHistory: [
-          {
-            date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            sizeGB: Math.floor(Math.random() * 200) + 50,
-            duration: Math.floor(Math.random() * 1800) + 600, // 10-30 min
-            success: true
-          },
-          {
-            date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-            sizeGB: Math.floor(Math.random() * 150) + 25,
-            duration: Math.floor(Math.random() * 1200) + 300,
-            success: true
-          }
-        ]
-      }
-    }
-
-    try {
-      const { host, user, remotePath, sshKeyPath } = replicationConfig
-
-      // Ejecutar comando SSH para obtener información del disco
-      const sshArgs = [
-        '-o', 'StrictHostKeyChecking=no',
-        '-o', 'ConnectTimeout=10'
-      ]
-
-      if (sshKeyPath) {
-        sshArgs.push('-i', sshKeyPath)
-      }
-
-      sshArgs.push(`${user}@${host}`, `df -BG ${remotePath} | tail -1`)
-
-      console.log('🔍 Consultando espacio en disco remoto:', `ssh ${sshArgs.join(' ')}`)
-
-      const output = await new Promise((resolve, reject) => {
-        const ssh = spawn('ssh', sshArgs)
-        let stdout = ''
-        let stderr = ''
-
-        ssh.stdout.on('data', (data) => { stdout += data.toString() })
-        ssh.stderr.on('data', (data) => { stderr += data.toString() })
-
-        ssh.on('close', (code) => {
-          if (code === 0) {
-            resolve(stdout.trim())
-          } else {
-            reject(new Error(`SSH failed with code ${code}: ${stderr}`))
-          }
-        })
-
-        ssh.on('error', (error) => {
-          reject(error)
-        })
-      })
-
-      // Parsear la salida de df
-      // Formato típico: /dev/sda1     50G    25G    23G    53% /mnt/videos
-      const parts = output.split(/\s+/).filter(part => part.trim() !== '')
-
-      if (parts.length < 6) {
-        throw new Error('Formato de salida df inesperado')
-      }
-
-      const totalGB = parseInt(parts[1].replace('G', ''))
-      const usedGB = parseInt(parts[2].replace('G', ''))
-      const availableGB = parseInt(parts[3].replace('G', ''))
-      const usePercent = parseInt(parts[4].replace('%', ''))
-
-      return {
-        available: true,
-        filesystem: parts[0],
-        mountPoint: parts[5],
-        totalGB,
-        usedGB,
-        availableGB,
-        usePercent,
-        lastChecked: new Date().toISOString()
-      }
-
-    } catch (error) {
-      console.error('❌ Error obteniendo información del disco remoto:', error)
+    // Usar la nueva función checkRemoteSpace que soporta mock
+    const spaceInfo = await this.checkRemoteSpace()
+    
+    if (!spaceInfo.available && !spaceInfo.isMock) {
       return {
         available: false,
-        error: error.message
+        error: spaceInfo.error || 'No se pudo conectar al servidor remoto'
       }
+    }
+    
+    // Enriquecer con información adicional
+    return {
+      available: true,
+      isMock: spaceInfo.isMock || false,
+      filesystem: '/dev/sdb1',
+      mountPoint: replicationConfig.remotePath || '/mnt/remote-backups',
+      totalGB: spaceInfo.totalGB,
+      usedGB: spaceInfo.usedGB,
+      availableGB: spaceInfo.freeGB,
+      usePercent: spaceInfo.usePercent,
+      canTransfer: spaceInfo.canTransfer,
+      isCritical: spaceInfo.isCritical,
+      lastChecked: spaceInfo.lastChecked,
+      serverType: spaceInfo.isMock ? 'Mock Server' : 'TrueNAS',
+      description: `${spaceInfo.totalGB >= 1024 ? Math.round(spaceInfo.totalGB / 1024) : spaceInfo.totalGB}${spaceInfo.totalGB >= 1024 ? 'TB' : 'GB'} External Storage Server${spaceInfo.isMock ? ' (Mock)' : ''}`,
+      status: spaceInfo.available ? 'online' : 'offline',
+      connectionType: replicationConfig.engine === 'rclone' ? 'SFTP (rclone)' : 'SSH (rsync)',
+      replicationConfig: {
+        engine: replicationConfig.engine,
+        verifyHash: replicationConfig.verifyHash,
+        transfers: replicationConfig.transfers,
+        retries: replicationConfig.retries
+      },
+      replicationHistory: spaceInfo.isMock ? [
+        {
+          date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          sizeGB: Math.floor(Math.random() * 200) + 50,
+          duration: Math.floor(Math.random() * 1800) + 600,
+          success: true
+        },
+        {
+          date: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+          sizeGB: Math.floor(Math.random() * 150) + 25,
+          duration: Math.floor(Math.random() * 1200) + 300,
+          success: true
+        }
+      ] : []
     }
   }
 
@@ -488,21 +1094,27 @@ class ReplicationService {
   }
 
   async getPendingFilesCount() {
-    if (!config.replication.host) return 0
+    if (!replicationConfig.host && !replicationConfig.useMock) return 0
+    
+    // Mock mode
+    if (replicationConfig.useMock) {
+      return Math.floor(Math.random() * 10) // 0-9 archivos pendientes simulados
+    }
     
     try {
-      const { host, user, remotePath, sshKeyPath } = config.replication
+      const { host, user, port, remotePath, sshKeyPath } = replicationConfig
       const localPath = path.join(process.cwd(), 'recordings') + '/'
+
+      const sshCmd = sshKeyPath 
+        ? `ssh -p ${port} -i ${sshKeyPath} -o StrictHostKeyChecking=no`
+        : `ssh -p ${port} -o StrictHostKeyChecking=no`
 
       const rsyncArgs = [
         '-avn', // -n = dry-run
+        '-e', sshCmd,
         localPath,
         `${user}@${host}:${remotePath}`
       ]
-
-      if (sshKeyPath) {
-        rsyncArgs.push('-e', `ssh -i ${sshKeyPath} -o StrictHostKeyChecking=no`)
-      }
 
       let output = ''
       await new Promise((resolve, reject) => {
@@ -512,12 +1124,11 @@ class ReplicationService {
           if (code === 0) resolve()
           else reject(new Error('rsync failed'))
         })
+        rsync.on('error', reject)
       })
 
       // Contar líneas que parecen archivos (no directorios ni mensajes de rsync)
-      // rsync dry-run lista los archivos que se transferirían
       const lines = output.split('\n')
-      // Filtrar líneas vacías y headers/footers de rsync
       const fileLines = lines.filter(line => 
         line.trim() !== '' && 
         !line.startsWith('sending incremental file list') && 

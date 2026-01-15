@@ -21,14 +21,40 @@ export const streamPaths = {
 }
 
 export const replication = {
+  // Configuración básica
   enabled: process.env.REPLICATION_ENABLED === 'true',
   host: process.env.REPLICATION_HOST,
+  port: parseInt(process.env.REPLICATION_PORT) || 22,
   user: process.env.REPLICATION_USER,
+  password: process.env.REPLICATION_PASSWORD,
   remotePath: process.env.REPLICATION_PATH,
   sshKeyPath: process.env.REPLICATION_SSH_KEY,
+  
+  // Motor de transferencia
+  engine: process.env.REPLICATION_ENGINE || 'rclone', // 'rclone' o 'rsync'
+  rcloneRemote: process.env.REPLICATION_RCLONE_REMOTE || 'truenas',
+  
+  // Opciones de transferencia
+  transfers: parseInt(process.env.REPLICATION_TRANSFERS) || 4,
+  checkers: parseInt(process.env.REPLICATION_CHECKERS) || 8,
+  retries: parseInt(process.env.REPLICATION_RETRIES) || 10,
+  retrySleep: parseInt(process.env.REPLICATION_RETRY_SLEEP) || 30,
+  timeout: parseInt(process.env.REPLICATION_TIMEOUT) || 300,
+  
+  // Verificación de integridad
+  verifyHash: process.env.REPLICATION_VERIFY_HASH !== 'false',
+  
+  // Umbrales de espacio remoto
+  remoteMaxUsePercent: parseInt(process.env.REPLICATION_REMOTE_MAX_USE_PERCENT) || 85,
+  remoteCriticalPercent: parseInt(process.env.REPLICATION_REMOTE_CRITICAL_PERCENT) || 95,
+  
+  // Backoff exponencial
+  backoffBase: parseInt(process.env.REPLICATION_BACKOFF_BASE) || 2,
+  backoffMax: parseInt(process.env.REPLICATION_BACKOFF_MAX) || 300,
+  
   // Configuración para mock de pruebas
   useMock: process.env.REPLICATION_USE_MOCK === 'true',
-  mockCapacityTB: parseInt(process.env.REPLICATION_MOCK_CAPACITY_TB) || 5
+  mockCapacityTB: parseInt(process.env.REPLICATION_MOCK_CAPACITY_TB) || 6
 }
 
 // Configuración de almacenamiento y retención

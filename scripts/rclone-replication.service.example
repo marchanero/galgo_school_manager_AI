@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SERVICIO SYSTEMD PARA REPLICACIÓN CON RCLONE
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Este archivo es un ejemplo de servicio systemd para ejecutar replicación
+# automática de videos hacia un servidor TrueNAS u otro servidor remoto.
+#
+# INSTALACIÓN:
+# 1. Copiar este archivo a /etc/systemd/system/rclone-replication.service
+# 2. Editar las variables según tu configuración
+# 3. Ejecutar: sudo systemctl daemon-reload
+# 4. Habilitar: sudo systemctl enable rclone-replication
+# 5. Iniciar: sudo systemctl start rclone-replication
+#
+# NOTA: Se recomienda usar la replicación integrada en la app (replicationService)
+#       Este servicio es una alternativa/backup independiente.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+[Unit]
+Description=Rclone Video Replication to TrueNAS
+Documentation=https://rclone.org/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+
+# Directorio de trabajo (donde está la app)
+WorkingDirectory=/home/galgo/galgo_school_manager_AI/backend
+
+# Variables de entorno (opcional, también se puede usar .env)
+Environment="RCLONE_CONFIG=/home/ubuntu/.config/rclone/rclone.conf"
+
+# Comando principal: sincronizar recordings → truenas
+# Ajustar rutas según tu configuración
+ExecStart=/usr/bin/rclone sync \
+    /home/galgo/galgo_school_manager_AI/backend/recordings \
+    truenas:/mnt/pool/videos \
+    --transfers=4 \
+    --checkers=8 \
+    --checksum \
+    --contimeout=30s \
+    --timeout=5m \
+    --retries=10 \
+    --retries-sleep=30s \
+    --low-level-retries=20 \
+    --stats=1m \
+    --log-level=INFO \
+    --log-file=/var/log/rclone-replication.log
+
+# Reiniciar en caso de fallo
+Restart=on-failure
+RestartSec=60
+
+# Timeout generoso para transferencias grandes
+TimeoutStartSec=0
+TimeoutStopSec=300
+
+# Límites de recursos (opcional)
+# MemoryLimit=512M
+# CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

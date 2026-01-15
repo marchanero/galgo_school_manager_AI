@@ -115,9 +115,51 @@ export const api = {
     return response.json()
   },
 
+  async getReplicationServerConfig() {
+    const response = await fetch(`${API_BASE_URL}/replication/server-config`)
+    if (!response.ok) throw new Error('Error al obtener configuración del servidor')
+    return response.json()
+  },
+
+  async saveReplicationServerConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/replication/server-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al guardar configuración del servidor')
+    return response.json()
+  },
+
   async getReplicationDiskInfo() {
     const response = await fetch(`${API_BASE_URL}/replication/disk-info`)
     if (!response.ok) throw new Error('Error al obtener información del disco local')
+    return response.json()
+  },
+
+  async getReplicationRemoteDiskInfo() {
+    const response = await fetch(`${API_BASE_URL}/replication/remote-disk-info`)
+    if (!response.ok) throw new Error('Error al obtener información del disco remoto')
+    return response.json()
+  },
+
+  async getReplicationStatus() {
+    const response = await fetch(`${API_BASE_URL}/replication/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de replicación')
+    return response.json()
+  },
+
+  async getReplicationPending() {
+    const response = await fetch(`${API_BASE_URL}/replication/pending`)
+    if (!response.ok) throw new Error('Error al obtener archivos pendientes')
+    return response.json()
+  },
+
+  async testReplicationConnection() {
+    const response = await fetch(`${API_BASE_URL}/replication/test-connection`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al probar conexión')
     return response.json()
   },
 

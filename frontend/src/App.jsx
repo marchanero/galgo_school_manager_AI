@@ -10,8 +10,7 @@ import RulesManager from './components/RulesManager'
 import DashboardSummary from './components/DashboardSummary'
 import ScenarioManager from './components/ScenarioManager'
 import SensorManager from './components/SensorManager'
-import ReplicationStats from './components/ReplicationStats'
-import ReplicationConfig from './components/ReplicationConfig'
+import BackupPanel from './components/BackupPanel'
 import StorageManager from './components/StorageManager'
 import RecordingDashboard from './components/RecordingDashboard'
 import VideoProcessing from './components/VideoProcessing'
@@ -207,12 +206,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
         {configSubTab === 'scenarios' && <ScenarioManager />}
         {configSubTab === 'sensors' && <SensorManager />}
         {configSubTab === 'mqtt' && <MQTTConfig />}
-        {configSubTab === 'replication' && (
-          <div className="space-y-6">
-            <ReplicationStats />
-            <ReplicationConfig />
-          </div>
-        )}
+        {configSubTab === 'replication' && <BackupPanel />}
         {configSubTab === 'storage' && <StorageManager />}
         {configSubTab === 'recordings' && <RecordingDashboard />}
         {configSubTab === 'processing' && <VideoProcessing />}

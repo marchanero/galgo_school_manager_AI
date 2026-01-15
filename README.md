@@ -12,6 +12,9 @@ Una aplicación web moderna para visualizar streams de cámaras RTSP usando **Re
 - ✅ Stream de video en tiempo real
 - ✅ Control de reproducción (play/pause)
 - ✅ Información en tiempo real de cámaras
+- ✅ **Sistema de replicación y backup con rclone/rsync**
+- ✅ **Persistencia de configuración de servidor en base de datos**
+- ✅ **Interfaz de configuración de backup en frontend**
 
 ## 📋 Requisitos Previos
 
@@ -35,6 +38,84 @@ La aplicación está configurada para conectarse a las siguientes cámaras RTSP:
 - `rtsp://admin:galgo2526@192.168.8.210:554/stream1`
 - `rtsp://admin:galgo2526@192.168.8.210:554/stream2`
 - `rtsp://admin:galgo2526@192.168.8.210:554/stream3`
+
+## 🔄 Sistema de Replicación y Backup
+
+La aplicación incluye un sistema completo de replicación de archivos para backup automático de grabaciones de cámaras a servidores externos.
+
+### Características del Sistema
+
+- **Motores de Replicación:** rclone (recomendado) o rsync
+- **Transporte Seguro:** SSH con claves o contraseñas
+- **Persistencia de Configuración:** Almacenamiento en base de datos Prisma
+- **Modo Simulación:** Configuración mock para desarrollo
+- **Verificación de Integridad:** Hash SHA256 opcional
+- **Reintentos Inteligentes:** Backoff exponencial
+- **Transferencias Paralelas:** Múltiples archivos simultáneos
+- **Monitoreo en Tiempo Real:** Dashboard con estadísticas
+
+### Configuración del Servidor de Backup
+
+1. **Acceder al Panel de Backup:**
+   - Ir a la pestaña "Replicación" en el frontend
+   - Hacer clic en el icono de engranaje ⚙️
+   - Expandir "Mostrar configuración del servidor"
+
+2. **Configurar Servidor:**
+   - **Modo Simulación:** Para desarrollo (sin servidor real)
+   - **Servidor Real:** Configurar IP, puerto, usuario y credenciales
+   - **Opciones Avanzadas:** Transferencias paralelas, reintentos, verificación hash
+
+3. **Probar Conexión:**
+   - Usar el botón "Probar Conexión" para verificar credenciales
+   - Guardar configuración para persistirla en la base de datos
+
+### Endpoints de API de Replicación
+
+- `GET /api/replication/stats` - Obtener estadísticas de replicación
+- `POST /api/replication/start` - Iniciar replicación manual
+- `POST /api/replication/stop` - Detener replicación
+- `GET /api/replication/server-config` - Obtener configuración del servidor
+- `POST /api/replication/server-config` - Guardar configuración del servidor
+- `POST /api/replication/test-connection` - Probar conexión al servidor
+
+### Ejemplo de Configuración
+
+```bash
+# Obtener configuración actual
+curl http://localhost:3000/api/replication/server-config
+
+# Configurar servidor mock
+curl -X POST http://localhost:3000/api/replication/server-config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "useMock": true,
+    "engine": "rclone",
+    "host": "",
+    "port": 22,
+    "user": "",
+    "remotePath": "/mnt/backups/cameras",
+    "transfers": 4,
+    "retries": 10,
+    "verifyHash": true
+  }'
+
+# Configurar servidor real (TrueNAS)
+curl -X POST http://localhost:3000/api/replication/server-config \
+  -H "Content-Type: application/json" \
+  -d '{
+    "useMock": false,
+    "engine": "rclone",
+    "host": "192.168.1.100",
+    "port": 22,
+    "user": "backupuser",
+    "password": "securepass",
+    "remotePath": "/mnt/backups/cameras",
+    "transfers": 4,
+    "retries": 10,
+    "verifyHash": true
+  }'
+```
 
 ## 🛠️ Instalación
 
@@ -100,7 +181,7 @@ El frontend estará disponible en `http://localhost:5173`
 ## 📁 Estructura del Proyecto
 
 ```
-camera_rtsp/
+galgo_school_manager_AI/
 ├── backend/
 │   ├── prisma/
 │   │   ├── schema.prisma       # Esquema de la base de datos
@@ -108,6 +189,11 @@ camera_rtsp/
 │   ├── src/
 │   │   ├── controllers/        # Lógica de negocio
 │   │   ├── routes/             # Rutas de la API
+│   │   │   ├── replication.js  # Endpoints de replicación
+│   │   │   └── ...
+│   │   ├── services/
+│   │   │   ├── replicationService.js  # Servicio de replicación
+│   │   │   └── ...
 │   │   ├── utils/              # Funciones auxiliares
 │   │   └── index.js            # Punto de entrada
 │   ├── .env                    # Variables de entorno
@@ -115,12 +201,26 @@ camera_rtsp/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/         # Componentes React
+│   │   ├── components/
+│   │   │   ├── BackupPanel.jsx  # Panel de configuración de backup
+│   │   │   └── ...
+│   │   ├── services/
+│   │   │   ├── api.js          # Cliente API con métodos de replicación
+│   │   │   └── ...
 │   │   ├── App.jsx             # Componente principal
 │   │   └── main.jsx            # Punto de entrada
 │   ├── index.html
 │   ├── vite.config.js
 │   └── package.json
+│
+├── docs/
+│   ├── REPLICATION_IMPROVEMENTS.md  # Mejoras propuestas
+│   └── network-setup.md     # Configuración de red
+│
+├── scripts/
+│   ├── setup-rclone-truenas.sh      # Script de configuración rclone
+│   ├── rclone-replication.service.example  # Servicio systemd
+│   └── ...
 │
 └── README.md
 ```
@@ -134,6 +234,15 @@ camera_rtsp/
 - `POST /cameras` - Crear nueva cámara
 - `PUT /cameras/:id` - Actualizar cámara
 - `DELETE /cameras/:id` - Eliminar cámara
+
+### Replicación y Backup
+
+- `GET /api/replication/stats` - Estadísticas de replicación
+- `POST /api/replication/start` - Iniciar replicación manual
+- `POST /api/replication/stop` - Detener replicación
+- `GET /api/replication/server-config` - Obtener configuración del servidor
+- `POST /api/replication/server-config` - Guardar configuración del servidor
+- `POST /api/replication/test-connection` - Probar conexión al servidor
 
 ### Ejemplo de solicitud POST
 
@@ -187,6 +296,16 @@ CAMERA_IP=192.168.8.210
 CAMERA_USER=admin
 CAMERA_PASS=galgo2526
 CAMERA_PORT=554
+
+# Configuración de Replicación (Opcional - Configurable vía API)
+REPLICATION_ENGINE=rclone
+REPLICATION_HOST=192.168.1.100
+REPLICATION_PORT=22
+REPLICATION_USER=backupuser
+REPLICATION_REMOTE_PATH=/mnt/backups/cameras
+REPLICATION_TRANSFERS=4
+REPLICATION_RETRIES=10
+REPLICATION_VERIFY_HASH=true
 ```
 
 ## 🐳 Docker Deployment
@@ -244,16 +363,25 @@ Se abrirá en `http://localhost:5555`
 
 ## 🔄 Workflow de Desarrollo
 
-1. Crear una cámara vía API:
+1. Configurar servidor de backup:
+```bash
+# Configurar modo simulación
+curl -X POST http://localhost:3000/api/replication/server-config \
+  -H "Content-Type: application/json" \
+  -d '{"useMock": true, "engine": "rclone"}'
+```
+
+2. Crear una cámara vía API:
 ```bash
 curl -X POST http://localhost:3000/cameras \
   -H "Content-Type: application/json" \
   -d '{"name":"Test Camera","rtspUrl":"rtsp://example.com/stream"}'
 ```
 
-2. Acceder a `http://localhost:5173`
-3. La cámara aparecerá en el listado
-4. Seleccionar cámara para visualizar stream
+3. Acceder a `http://localhost:5173`
+4. La cámara aparecerá en el listado
+5. Seleccionar cámara para visualizar stream
+6. Ir a la pestaña "Replicación" para configurar y monitorear backups
 
 ## 🚢 Deployment
 
@@ -316,6 +444,52 @@ Para más detalles, consulta la [documentación completa](docs/network-setup.md)
 ping 192.168.8.210  # Cámara
 ffprobe rtsp://admin:galgo2526@192.168.8.210:554/stream1  # Stream RTSP
 ```
+
+## 🚀 Mejoras Implementadas y Futuras - Sistema de Replicación
+
+El proyecto incluye funcionalidades implementadas y un roadmap de mejoras adicionales para el sistema de replicación y sincronización de archivos.
+
+### ✅ Funcionalidades Implementadas
+
+- ✅ **Persistencia de configuración del servidor** - Configuración guardada en base de datos Prisma
+- ✅ **Interfaz de configuración en frontend** - Panel completo para configurar servidor de backup
+- ✅ **Modo simulación** - Configuración mock para desarrollo sin servidor real
+- ✅ **Sistema de hash y verificación de integridad** - Verificación opcional con SHA256
+- ✅ **Reintentos con backoff exponencial** - Reintentos inteligentes para transferencias fallidas
+- ✅ **Transferencias en paralelo** - Múltiples archivos simultáneos
+- ✅ **Monitoreo básico** - Estadísticas de replicación en tiempo real
+
+### 🔄 Mejoras Futuras (Fases 2-4)
+- 🔄 **Sincronización bidireccional** - Recuperar archivos faltantes desde servidor externo
+- 🔄 **Sistema de prioridades** - Transferir primero archivos importantes o recientes
+- 🔄 **Política de limpieza automática** - Eliminar archivos antiguos cuando se alcanza umbral de espacio
+- 🔄 **Dashboard de estado básico** - Monitoreo visual del estado de replicación
+
+### Fase 3: Optimización (Semanas 5-6)
+- ⚡ **Transferencias en paralelo** - Múltiples archivos simultáneos para aprovechar ancho de banda
+- ⚡ **Compresión opcional** - Reducir tiempo de transferencia para archivos grandes
+- ⚡ **Métricas y estadísticas** - KPIs de rendimiento y disponibilidad
+- ⚡ **Dashboard avanzado** - Interfaz completa de monitoreo en tiempo real
+
+### Fase 4: Seguridad (Semanas 7-8)
+- 🔒 **Validación de fingerprints** - Verificar identidad de servidores remotos
+- 🔒 **Rotación de credenciales** - Actualización automática de claves SSH
+- 🔒 **Auditoría completa** - Trazabilidad total de operaciones
+- 🔒 **Alertas automáticas** - Notificaciones de eventos críticos
+
+### Características Clave
+- **Verificación de integridad** con hash SHA256
+- **Reintentos inteligentes** con backoff exponencial
+- **Monitoreo de capacidad** remota automática
+- **Sincronización bidireccional** para recuperación de datos
+- **Transferencias paralelas** para máximo rendimiento
+- **Compresión opcional** para archivos grandes
+- **Sistema de prioridades** para archivos críticos
+- **Dashboard en tiempo real** con métricas detalladas
+
+Para más detalles sobre la implementación y especificaciones técnicas, consulta el documento completo en [`docs/REPLICATION_IMPROVEMENTS.md`](docs/REPLICATION_IMPROVEMENTS.md).
+
+---
 
 ## 🤝 Contribuir
 
