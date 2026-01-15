@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { 
-  Radio, 
-  Wifi, 
-  WifiOff, 
-  Users, 
-  MessageSquare, 
+import {
+  Radio,
+  Wifi,
+  WifiOff,
+  Users,
+  MessageSquare,
   Activity,
   Server,
   RefreshCw,
@@ -49,7 +49,7 @@ export default function MQTTConfig() {
   const [activeTab, setActiveTab] = useState('overview')
   const [publishForm, setPublishForm] = useState({ topic: '', payload: '', qos: 0, retain: false })
   const [isPublishing, setIsPublishing] = useState(false)
-  
+
   // Estados para edición de servidores
   const [isAddingServer, setIsAddingServer] = useState(false)
   const [editingServerId, setEditingServerId] = useState(null)
@@ -93,7 +93,11 @@ export default function MQTTConfig() {
       ])
 
       if (healthRes.status === 'fulfilled') setHealth(healthRes.value)
-      if (statsRes.status === 'fulfilled') setStats(statsRes.value)
+      // stats viene como array, extraemos el primer elemento
+      if (statsRes.status === 'fulfilled') {
+        const statsData = Array.isArray(statsRes.value) ? statsRes.value[0] : statsRes.value
+        setStats(statsData)
+      }
       if (clientsRes.status === 'fulfilled') setClients(clientsRes.value?.data || [])
       if (subscriptionsRes.status === 'fulfilled') setSubscriptions(subscriptionsRes.value?.data || [])
       if (topicsRes.status === 'fulfilled') setTopics(topicsRes.value?.data || [])
@@ -163,9 +167,9 @@ export default function MQTTConfig() {
           apiSecret: serverForm.password
         })
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast.success('Conexión exitosa con el broker MQTT')
       } else {
@@ -187,18 +191,18 @@ export default function MQTTConfig() {
 
     setIsSaving(true)
     try {
-      const url = editingServerId 
+      const url = editingServerId
         ? `${API_BASE}/servers/${editingServerId}`
         : `${API_BASE}/servers`
-      
+
       const res = await fetch(url, {
         method: editingServerId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(serverForm)
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast.success(editingServerId ? 'Servidor actualizado' : 'Servidor creado')
         cancelServerForm()
@@ -220,9 +224,9 @@ export default function MQTTConfig() {
       const res = await fetch(`${API_BASE}/servers/${serverId}/activate`, {
         method: 'POST'
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast.success(data.message || 'Servidor activado')
         loadData()
@@ -239,14 +243,14 @@ export default function MQTTConfig() {
   // Eliminar servidor
   const deleteServer = async (serverId) => {
     if (!confirm('¿Eliminar este servidor?')) return
-    
+
     try {
       const res = await fetch(`${API_BASE}/servers/${serverId}`, {
         method: 'DELETE'
       })
-      
+
       const data = await res.json()
-      
+
       if (data.success) {
         toast.success('Servidor eliminado')
         loadData()
@@ -290,7 +294,7 @@ export default function MQTTConfig() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(publishForm)
       })
-      
+
       if (res.ok) {
         toast.success('Mensaje publicado')
         setPublishForm({ ...publishForm, payload: '' })
@@ -352,11 +356,10 @@ export default function MQTTConfig() {
 
         <div className="flex items-center gap-3">
           {/* Estado de conexión */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            isConnected 
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${isConnected
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
               : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-          }`}>
+            }`}>
             {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             {isConnected ? 'Conectado' : 'Desconectado'}
           </div>
@@ -443,11 +446,10 @@ export default function MQTTConfig() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id
                     ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20'
                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
@@ -506,14 +508,13 @@ export default function MQTTConfig() {
                   <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Listeners</h3>
                   <div className="grid gap-2">
                     {listeners.map((listener, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            listener.running ? 'bg-green-500' : 'bg-red-500'
-                          }`} />
+                          <div className={`w-2 h-2 rounded-full ${listener.running ? 'bg-green-500' : 'bg-red-500'
+                            }`} />
                           <span className="font-mono text-sm">{listener.id || listener.name}</span>
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -535,7 +536,7 @@ export default function MQTTConfig() {
                   Clientes Conectados ({clients.length})
                 </h3>
               </div>
-              
+
               {clients.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -586,7 +587,7 @@ export default function MQTTConfig() {
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">
                 Suscripciones Activas ({subscriptions.length})
               </h3>
-              
+
               {subscriptions.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -627,7 +628,7 @@ export default function MQTTConfig() {
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">
                 Topics Activos ({topics.length})
               </h3>
-              
+
               {topics.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Network className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -636,7 +637,7 @@ export default function MQTTConfig() {
               ) : (
                 <div className="space-y-2">
                   {topics.map((topic, idx) => (
-                    <div 
+                    <div
                       key={idx}
                       className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
                     >
@@ -655,7 +656,7 @@ export default function MQTTConfig() {
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">
                 Publicar Mensaje
               </h3>
-              
+
               <form onSubmit={handlePublish} className="space-y-4 max-w-xl">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -730,7 +731,7 @@ export default function MQTTConfig() {
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">
                 Nodos del Cluster ({nodes.length})
               </h3>
-              
+
               {nodes.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Server className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -739,14 +740,13 @@ export default function MQTTConfig() {
               ) : (
                 <div className="grid gap-4">
                   {nodes.map((node, idx) => (
-                    <div 
+                    <div
                       key={idx}
                       className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600"
                     >
                       <div className="flex items-center gap-3 mb-3">
-                        <div className={`w-3 h-3 rounded-full ${
-                          node.node_status === 'running' ? 'bg-green-500' : 'bg-red-500'
-                        }`} />
+                        <div className={`w-3 h-3 rounded-full ${node.node_status === 'running' ? 'bg-green-500' : 'bg-red-500'
+                          }`} />
                         <span className="font-medium text-gray-900 dark:text-white">{node.node}</span>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -824,7 +824,7 @@ export default function MQTTConfig() {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Broker MQTT
@@ -838,7 +838,7 @@ export default function MQTTConfig() {
                       />
                       <p className="text-xs text-gray-500 mt-1">Formato: mqtt://host:puerto</p>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Usuario
@@ -851,7 +851,7 @@ export default function MQTTConfig() {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Contraseña
@@ -864,7 +864,7 @@ export default function MQTTConfig() {
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
-                    
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Client ID
@@ -888,14 +888,14 @@ export default function MQTTConfig() {
                       <TestTube className={`w-4 h-4 ${isTesting ? 'animate-pulse' : ''}`} />
                       {isTesting ? 'Probando...' : 'Probar Conexión'}
                     </button>
-                    
+
                     <button
                       onClick={cancelServerForm}
                       className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                     >
                       Cancelar
                     </button>
-                    
+
                     <button
                       onClick={saveServer}
                       disabled={isSaving || !serverForm.broker || !serverForm.name}
@@ -920,11 +920,10 @@ export default function MQTTConfig() {
                   {servers.map(server => (
                     <div
                       key={server.id}
-                      className={`bg-white dark:bg-gray-800 rounded-lg p-4 border-2 transition-all ${
-                        server.isActive
+                      className={`bg-white dark:bg-gray-800 rounded-lg p-4 border-2 transition-all ${server.isActive
                           ? 'border-green-500 dark:border-green-600 shadow-lg shadow-green-500/10'
                           : 'border-gray-200 dark:border-gray-700'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -957,7 +956,7 @@ export default function MQTTConfig() {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-2 ml-4">
                           {!server.isActive && (
                             <button
@@ -973,7 +972,7 @@ export default function MQTTConfig() {
                               {activatingId === server.id ? 'Activando...' : 'Activar'}
                             </button>
                           )}
-                          
+
                           <button
                             onClick={() => openEditServer(server)}
                             className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
@@ -981,7 +980,7 @@ export default function MQTTConfig() {
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          
+
                           {!server.isActive && (
                             <button
                               onClick={() => deleteServer(server.id)}

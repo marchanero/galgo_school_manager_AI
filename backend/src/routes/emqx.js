@@ -12,10 +12,23 @@ const prisma = new PrismaClient()
 
 // Configuración de EMQX por defecto
 let EMQX_CONFIG = {
-  broker: process.env.MQTT_BROKER || 'mqtt://100.82.84.24:1883',
-  apiUrl: process.env.EMQX_API_URL || 'http://100.82.84.24:18083/api/v5',
+  broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883',
+  apiUrl: process.env.EMQX_API_URL || 'http://localhost:18083/api/v5',
   apiKey: process.env.EMQX_API_KEY || 'admin',
-  apiSecret: process.env.EMQX_API_SECRET || 'galgo2526'
+  apiSecret: process.env.EMQX_API_SECRET || 'galgo2526',
+  hasApi: true // Indica si el broker tiene API REST accesible
+}
+
+/**
+ * Detectar si un broker tiene API accesible
+ * Brokers públicos como broker.emqx.io no tienen API
+ */
+function isLocalBroker(brokerUrl) {
+  if (!brokerUrl) return false
+  return brokerUrl.includes('localhost') || 
+         brokerUrl.includes('127.0.0.1') || 
+         brokerUrl.includes('100.82.') ||  // Tailscale
+         brokerUrl.includes('192.168.')    // Red local
 }
 
 // Cargar configuración de la base de datos al iniciar
@@ -23,13 +36,15 @@ async function loadConfigFromDB() {
   try {
     const dbConfig = await prisma.mqttConfig.findFirst({ where: { isActive: true } })
     if (dbConfig) {
+      const hasApi = isLocalBroker(dbConfig.broker)
       EMQX_CONFIG = {
         broker: dbConfig.broker,
-        apiUrl: dbConfig.broker.replace('mqtt://', 'http://').replace(':1883', ':18083/api/v5'),
+        apiUrl: hasApi ? dbConfig.broker.replace('mqtt://', 'http://').replace(':1883', ':18083/api/v5') : null,
         apiKey: dbConfig.username,
-        apiSecret: dbConfig.password
+        apiSecret: dbConfig.password,
+        hasApi
       }
-      console.log('✅ Configuración EMQX cargada de la base de datos')
+      console.log(`✅ Configuración EMQX cargada: ${dbConfig.name} (API: ${hasApi ? 'Sí' : 'No'})`)
     }
   } catch (error) {
     console.log('⚠️ Usando configuración EMQX por defecto:', error.message)
@@ -37,7 +52,10 @@ async function loadConfigFromDB() {
 }
 loadConfigFromDB()
 
-// Cliente axios dinámico para EMQX
+/**
+ * Cliente axios para EMQX con Basic Auth (API Key)
+ * Las API Keys de EMQX usan Basic Auth: apiKey:apiSecret
+ */
 function getEmqxClient() {
   return axios.create({
     baseURL: EMQX_CONFIG.apiUrl,
@@ -45,6 +63,9 @@ function getEmqxClient() {
     auth: {
       username: EMQX_CONFIG.apiKey,
       password: EMQX_CONFIG.apiSecret
+    },
+    headers: {
+      'Content-Type': 'application/json'
     }
   })
 }
@@ -54,6 +75,9 @@ function getEmqxClient() {
  * Obtener estadísticas del cluster
  */
 router.get('/stats', async (req, res) => {
+  if (!EMQX_CONFIG.hasApi) {
+    return res.json([{ node: 'external', 'connections.count': 0, 'subscriptions.count': 0, apiAvailable: false }])
+  }
   try {
     const response = await getEmqxClient().get('/stats')
     res.json(response.data)
@@ -71,6 +95,7 @@ router.get('/stats', async (req, res) => {
  * Obtener clientes conectados
  */
 router.get('/clients', async (req, res) => {
+  if (!EMQX_CONFIG.hasApi) return res.json({ data: [], meta: { count: 0 } })
   try {
     const response = await getEmqxClient().get('/clients', { params: req.query })
     res.json(response.data)
@@ -105,6 +130,7 @@ router.get('/clients/:clientId', async (req, res) => {
  * Obtener suscripciones activas
  */
 router.get('/subscriptions', async (req, res) => {
+  if (!EMQX_CONFIG.hasApi) return res.json({ data: [], meta: { count: 0 } })
   try {
     const response = await getEmqxClient().get('/subscriptions', { params: req.query })
     res.json(response.data)
@@ -122,6 +148,7 @@ router.get('/subscriptions', async (req, res) => {
  * Obtener nodos del cluster
  */
 router.get('/nodes', async (req, res) => {
+  if (!EMQX_CONFIG.hasApi) return res.json([])
   try {
     const response = await getEmqxClient().get('/nodes')
     res.json(response.data)
@@ -139,6 +166,7 @@ router.get('/nodes', async (req, res) => {
  * Obtener tópicos activos
  */
 router.get('/topics', async (req, res) => {
+  if (!EMQX_CONFIG.hasApi) return res.json({ data: [], meta: { count: 0 } })
   try {
     const response = await getEmqxClient().get('/topics', { params: req.query })
     res.json(response.data)
@@ -173,6 +201,15 @@ router.get('/routes', async (req, res) => {
  * Verificar conectividad con EMQX
  */
 router.get('/health', async (req, res) => {
+  // Para brokers públicos sin API, reportar como conectado (solo MQTT)
+  if (!EMQX_CONFIG.hasApi) {
+    return res.json({
+      status: 'mqtt_only',
+      broker: EMQX_CONFIG.broker,
+      apiAvailable: false,
+      timestamp: new Date().toISOString()
+    })
+  }
   try {
     const response = await getEmqxClient().get('/stats')
     res.json({
