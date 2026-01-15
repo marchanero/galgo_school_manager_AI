@@ -1,4 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { 
+  Play, 
+  Pause, 
+  Maximize2, 
+  Camera, 
+  Wifi, 
+  WifiOff, 
+  RefreshCw,
+  Circle,
+  Download,
+  Settings,
+  Volume2,
+  VolumeX,
+  Info,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Loader2
+} from 'lucide-react'
 import './CameraViewer.css'
 
 function CameraViewer({ camera }) {
@@ -177,98 +196,239 @@ function CameraViewer({ camera }) {
   const getStatusColor = () => {
     switch (connectionStatus) {
       case 'streaming':
-        return '#51cf66'
+        return 'bg-emerald-500'
       case 'conectando':
-        return '#ffd43b'
+        return 'bg-amber-500'
       case 'pausado':
-        return '#ff8787'
+        return 'bg-gray-500'
       case 'error':
-        return '#ff8787'
+        return 'bg-red-500'
       default:
-        return '#868e96'
+        return 'bg-gray-500'
+    }
+  }
+
+  const getStatusIcon = () => {
+    switch (connectionStatus) {
+      case 'streaming':
+        return <CheckCircle className="w-3.5 h-3.5" />
+      case 'conectando':
+        return <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      case 'pausado':
+        return <Pause className="w-3.5 h-3.5" />
+      case 'error':
+        return <AlertCircle className="w-3.5 h-3.5" />
+      default:
+        return <Circle className="w-3.5 h-3.5" />
+    }
+  }
+
+  const getStatusText = () => {
+    switch (connectionStatus) {
+      case 'streaming':
+        return 'Transmitiendo'
+      case 'conectando':
+        return 'Conectando...'
+      case 'pausado':
+        return 'Pausado'
+      case 'error':
+        return 'Error'
+      default:
+        return 'Desconocido'
     }
   }
 
   return (
-    <div className="camera-viewer">
-      <div className="viewer-header">
-        <h2>{camera.name}</h2>
-        <div className="controls">
+    <div className="camera-viewer-modern">
+      {/* Header */}
+      <div className="viewer-header-modern">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <Camera className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{camera.name}</h2>
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${getStatusColor()} text-white font-medium`}>
+                {getStatusIcon()}
+                {getStatusText()}
+              </span>
+              {connectionStatus === 'streaming' && (
+                <span className="flex items-center gap-1">
+                  <Circle className="w-2 h-2 text-red-500 fill-red-500 animate-pulse" />
+                  LIVE
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
           <button 
-            className="control-btn"
+            className={`control-btn-modern ${isPlaying ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-500 hover:bg-emerald-600'}`}
             onClick={handlePlayPause}
             title={isPlaying ? 'Pausar' : 'Reproducir'}
           >
-            {isPlaying ? '⏸️ Pausar' : '▶️ Reproducir'}
+            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isPlaying ? 'Pausar' : 'Reproducir'}</span>
           </button>
-          <button className="control-btn" onClick={handleFullscreen} title="Fullscreen">
-            🖥️ Fullscreen
-          </button>
+          
           <button 
-            className="control-btn" 
+            className="control-btn-modern bg-gray-600 hover:bg-gray-700" 
+            onClick={handleFullscreen} 
+            title="Pantalla completa"
+          >
+            <Maximize2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Fullscreen</span>
+          </button>
+          
+          <button 
+            className="control-btn-modern bg-blue-500 hover:bg-blue-600" 
             onClick={handleSnapshot}
             disabled={!imgRef.current}
             title="Captura"
           >
-            📸 Captura
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Captura</span>
           </button>
-          <div className="connection-status" style={{ backgroundColor: getStatusColor() }}>
-            {connectionStatus}
-          </div>
         </div>
       </div>
       
-      <div className="video-container" ref={containerRef}>
+      {/* Video Container */}
+      <div className="video-container-modern" ref={containerRef}>
         {connectionStatus === 'conectando' && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>⏳ Conectando al stream...</p>
+          <div className="stream-placeholder">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+              </div>
+              <div className="text-center">
+                <p className="text-gray-300 font-medium">Conectando al stream</p>
+                <p className="text-sm text-gray-500">Por favor espere...</p>
+              </div>
+            </div>
           </div>
         )}
         
         {connectionStatus === 'error' && (
-          <div className="loading">
-            <div className="spinner"></div>
-            <p>❌ Error conectando... reintentando</p>
+          <div className="stream-placeholder">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-red-400" />
+              </div>
+              <div className="text-center">
+                <p className="text-gray-300 font-medium">Error de conexión</p>
+                <p className="text-sm text-gray-500">Reintentando automáticamente...</p>
+              </div>
+              <button 
+                onClick={handlePlayPause}
+                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reintentar
+              </button>
+            </div>
           </div>
         )}
 
         {connectionStatus === 'pausado' && (
-          <div className="paused-placeholder">
-            <p>🔇 Stream Pausado</p>
-            <button onClick={handlePlayPause} className="play-btn">
-              ▶️ Iniciar Stream
-            </button>
+          <div className="stream-placeholder">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center shadow-2xl">
+                <Pause className="w-10 h-10 text-gray-400" />
+              </div>
+              <div className="text-center">
+                <p className="text-gray-300 font-medium text-lg">Stream Pausado</p>
+                <p className="text-sm text-gray-500">Haz clic para reanudar</p>
+              </div>
+              <button 
+                onClick={handlePlayPause} 
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2"
+              >
+                <Play className="w-5 h-5" />
+                Iniciar Stream
+              </button>
+            </div>
           </div>
         )}
 
         {connectionStatus === 'streaming' && (
           <img 
             ref={imgRef}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block'
-            }}
+            className="stream-image"
             alt="Stream MJPEG"
           />
         )}
 
-        <div className="stream-overlay">
-          <span className="live-badge">🔴 LIVE {connectionStatus === 'streaming' ? '1fps' : ''}</span>
-          <span className="camera-info">{camera.name}</span>
+        {/* Overlay */}
+        <div className="stream-overlay-modern">
+          <div className="flex items-center gap-2">
+            <span className="live-badge-modern">
+              <Circle className="w-2 h-2 fill-white animate-pulse" />
+              LIVE
+            </span>
+            {connectionStatus === 'streaming' && (
+              <span className="fps-badge">~1 fps</span>
+            )}
+          </div>
+          <span className="camera-name-badge">{camera.name}</span>
         </div>
       </div>
 
-      <div className="viewer-footer">
-        <div className="info">
-          <p><strong>Modo:</strong> ⚡ MJPEG (1 fps, fetch streaming)</p>
-          <p><strong>URL RTSP:</strong> <code>{camera.rtspUrl}</code></p>
-          <p><strong>Estado:</strong> {camera.isActive ? '✅ En línea' : '❌ Offline'}</p>
-          <p><strong>Descripción:</strong> {camera.description || 'Sin descripción'}</p>
-          <p><strong>Última actualización:</strong> {new Date(camera.updatedAt).toLocaleString('es-ES')}</p>
+      {/* Footer Info */}
+      <div className="viewer-footer-modern">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="info-card">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
+              <Settings className="w-3.5 h-3.5" />
+              Modo
+            </div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">MJPEG Streaming</p>
+          </div>
+          
+          <div className="info-card">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
+              <Wifi className="w-3.5 h-3.5" />
+              URL RTSP
+            </div>
+            <p className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">{camera.rtspUrl}</p>
+          </div>
+          
+          <div className="info-card">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
+              <Circle className="w-3.5 h-3.5" />
+              Estado
+            </div>
+            <p className={`text-sm font-medium ${camera.isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              {camera.isActive ? '● En línea' : '○ Offline'}
+            </p>
+          </div>
+          
+          <div className="info-card">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 text-xs mb-1">
+              <Clock className="w-3.5 h-3.5" />
+              Actualizado
+            </div>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {new Date(camera.updatedAt).toLocaleString('es-ES', { 
+                day: '2-digit', 
+                month: 'short', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+              })}
+            </p>
+          </div>
         </div>
+        
+        {camera.description && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 text-xs mb-1">
+              <Info className="w-3.5 h-3.5" />
+              Descripción
+            </div>
+            <p className="text-sm text-blue-800 dark:text-blue-300">{camera.description}</p>
+          </div>
+        )}
       </div>
     </div>
   )

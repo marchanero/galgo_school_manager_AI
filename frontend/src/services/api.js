@@ -61,6 +61,29 @@ export const api = {
     return response.json()
   },
 
+  // Media Server Status
+  async getMediaStatus() {
+    const response = await fetch(`${API_BASE_URL}/media/status`)
+    if (!response.ok) throw new Error('Error al obtener estado del servidor de medios')
+    return response.json()
+  },
+
+  async stopMediaRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/media/stop/${cameraId}`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabación')
+    return response.json()
+  },
+
+  async stopAllMediaRecordings() {
+    const response = await fetch(`${API_BASE_URL}/media/stop-all`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabaciones')
+    return response.json()
+  },
+
   // Replicación
   async getReplicationStats() {
     const response = await fetch(`${API_BASE_URL}/replication/stats`)
@@ -92,9 +115,395 @@ export const api = {
     return response.json()
   },
 
+  async getReplicationServerConfig() {
+    const response = await fetch(`${API_BASE_URL}/replication/server-config`)
+    if (!response.ok) throw new Error('Error al obtener configuración del servidor')
+    return response.json()
+  },
+
+  async saveReplicationServerConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/replication/server-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al guardar configuración del servidor')
+    return response.json()
+  },
+
   async getReplicationDiskInfo() {
     const response = await fetch(`${API_BASE_URL}/replication/disk-info`)
     if (!response.ok) throw new Error('Error al obtener información del disco local')
+    return response.json()
+  },
+
+  async getReplicationRemoteDiskInfo() {
+    const response = await fetch(`${API_BASE_URL}/replication/remote-disk-info`)
+    if (!response.ok) throw new Error('Error al obtener información del disco remoto')
+    return response.json()
+  },
+
+  async getReplicationStatus() {
+    const response = await fetch(`${API_BASE_URL}/replication/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de replicación')
+    return response.json()
+  },
+
+  async getReplicationPending() {
+    const response = await fetch(`${API_BASE_URL}/replication/pending`)
+    if (!response.ok) throw new Error('Error al obtener archivos pendientes')
+    return response.json()
+  },
+
+  async testReplicationConnection() {
+    const response = await fetch(`${API_BASE_URL}/replication/test-connection`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al probar conexión')
+    return response.json()
+  },
+
+  // Almacenamiento
+  async getStorageStatus() {
+    const response = await fetch(`${API_BASE_URL}/storage/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageSummary() {
+    const response = await fetch(`${API_BASE_URL}/storage/summary`)
+    if (!response.ok) throw new Error('Error al obtener resumen de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageConfig() {
+    const response = await fetch(`${API_BASE_URL}/storage/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración de almacenamiento')
+    return response.json()
+  },
+
+  async updateStorageConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/storage/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración de almacenamiento')
+    return response.json()
+  },
+
+  async getStorageRecordings(filters = {}) {
+    const params = new URLSearchParams(filters)
+    const response = await fetch(`${API_BASE_URL}/storage/recordings?${params}`)
+    if (!response.ok) throw new Error('Error al obtener grabaciones')
+    return response.json()
+  },
+
+  async deleteStorageRecording(scenario, date, cameraId, filename) {
+    const params = new URLSearchParams({ scenario, date, cameraId, filename })
+    const response = await fetch(`${API_BASE_URL}/storage/recording?${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabación')
+    return response.json()
+  },
+
+  async generateThumbnail(scenario, date, cameraId, filename) {
+    const response = await fetch(`${API_BASE_URL}/storage/generate-thumbnail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario, date, cameraId, filename })
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnail')
+    return response.json()
+  },
+
+  async triggerStorageCleanup() {
+    const response = await fetch(`${API_BASE_URL}/storage/cleanup`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al iniciar limpieza')
+    return response.json()
+  },
+
+  async checkStorageSpace() {
+    const response = await fetch(`${API_BASE_URL}/storage/check`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al verificar espacio')
+    return response.json()
+  },
+
+  async setRetentionPolicy(scenario, days) {
+    const response = await fetch(`${API_BASE_URL}/storage/retention/${encodeURIComponent(scenario)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days })
+    })
+    if (!response.ok) throw new Error('Error al establecer política de retención')
+    return response.json()
+  },
+
+  async deleteScenarioRecordings(scenario, olderThanDays = 0) {
+    const params = olderThanDays > 0 ? `?olderThan=${olderThanDays}` : ''
+    const response = await fetch(`${API_BASE_URL}/storage/scenario/${encodeURIComponent(scenario)}${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabaciones del escenario')
+    return response.json()
+  },
+
+  async deleteCameraRecordings(cameraId, olderThanDays = 0) {
+    const params = olderThanDays > 0 ? `?olderThan=${olderThanDays}` : ''
+    const response = await fetch(`${API_BASE_URL}/storage/camera/${cameraId}${params}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al eliminar grabaciones de la cámara')
+    return response.json()
+  },
+
+  // Grabaciones Resilientes
+  async getRecordingsStatus() {
+    const response = await fetch(`${API_BASE_URL}/recordings/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de grabaciones')
+    return response.json()
+  },
+
+  async getRecordingStats(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/stats`)
+    if (!response.ok) throw new Error('Error al obtener estadísticas')
+    return response.json()
+  },
+
+  async startRecording(data) {
+    const response = await fetch(`${API_BASE_URL}/recordings/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al iniciar grabación')
+    return response.json()
+  },
+
+  async stopRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/stop`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabación')
+    return response.json()
+  },
+
+  async stopAllRecordings() {
+    const response = await fetch(`${API_BASE_URL}/recordings/stop-all`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detener grabaciones')
+    return response.json()
+  },
+
+  async updateRecordingsConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/recordings/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async isRecording(cameraId) {
+    const response = await fetch(`${API_BASE_URL}/recordings/${cameraId}/is-recording`)
+    if (!response.ok) throw new Error('Error al verificar grabación')
+    return response.json()
+  },
+
+  // Post-procesamiento de Video
+  async getProcessingStatus() {
+    const response = await fetch(`${API_BASE_URL}/processing/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de procesamiento')
+    return response.json()
+  },
+
+  async getProcessingConfig() {
+    const response = await fetch(`${API_BASE_URL}/processing/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración')
+    return response.json()
+  },
+
+  async updateProcessingConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/processing/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async generateThumbnail(scenario, date, cameraId, filename) {
+    const response = await fetch(`${API_BASE_URL}/storage/generate-thumbnail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenario, date, cameraId, filename })
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnail')
+    return response.json()
+  },
+
+  async generateBatchThumbnails(options = {}) {
+    const response = await fetch(`${API_BASE_URL}/processing/thumbnails/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    })
+    if (!response.ok) throw new Error('Error al generar thumbnails')
+    return response.json()
+  },
+
+  async getProcessingThumbnails() {
+    const response = await fetch(`${API_BASE_URL}/processing/thumbnails`)
+    if (!response.ok) throw new Error('Error al obtener thumbnails')
+    return response.json()
+  },
+
+  async compressVideo(data) {
+    const response = await fetch(`${API_BASE_URL}/processing/compress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al comprimir video')
+    return response.json()
+  },
+
+  async compressOldVideos(options = {}) {
+    const response = await fetch(`${API_BASE_URL}/processing/compress/old`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options)
+    })
+    if (!response.ok) throw new Error('Error al comprimir videos antiguos')
+    return response.json()
+  },
+
+  async extractClip(data) {
+    const response = await fetch(`${API_BASE_URL}/processing/clip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    if (!response.ok) throw new Error('Error al extraer clip')
+    return response.json()
+  },
+
+  async getProcessingClips() {
+    const response = await fetch(`${API_BASE_URL}/processing/clips`)
+    if (!response.ok) throw new Error('Error al obtener clips')
+    return response.json()
+  },
+
+  async getVideoInfo(videoPath) {
+    const response = await fetch(`${API_BASE_URL}/processing/video-info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoPath })
+    })
+    if (!response.ok) throw new Error('Error al obtener info de video')
+    return response.json()
+  },
+
+  async cancelProcessingTask(taskId) {
+    const response = await fetch(`${API_BASE_URL}/processing/task/${taskId}`, {
+      method: 'DELETE'
+    })
+    if (!response.ok) throw new Error('Error al cancelar tarea')
+    return response.json()
+  },
+
+  // Rendimiento y Hardware
+  async getPerformanceStatus() {
+    const response = await fetch(`${API_BASE_URL}/performance/status`)
+    if (!response.ok) throw new Error('Error al obtener estado de rendimiento')
+    return response.json()
+  },
+
+  async getPerformanceMetrics() {
+    const response = await fetch(`${API_BASE_URL}/performance/metrics`)
+    if (!response.ok) throw new Error('Error al obtener métricas')
+    return response.json()
+  },
+
+  async getHardwareInfo() {
+    const response = await fetch(`${API_BASE_URL}/performance/hardware`)
+    if (!response.ok) throw new Error('Error al obtener info de hardware')
+    return response.json()
+  },
+
+  async detectHardware() {
+    const response = await fetch(`${API_BASE_URL}/performance/detect`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al detectar hardware')
+    return response.json()
+  },
+
+  async runPerformanceBenchmark() {
+    const response = await fetch(`${API_BASE_URL}/performance/benchmark`, {
+      method: 'POST'
+    })
+    if (!response.ok) throw new Error('Error al ejecutar benchmark')
+    return response.json()
+  },
+
+  async setPerformanceProfile(profile) {
+    const response = await fetch(`${API_BASE_URL}/performance/profile`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile })
+    })
+    if (!response.ok) throw new Error('Error al cambiar perfil')
+    return response.json()
+  },
+
+  async setHwAccel(enabled) {
+    const response = await fetch(`${API_BASE_URL}/performance/hwaccel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    })
+    if (!response.ok) throw new Error('Error al configurar hwaccel')
+    return response.json()
+  },
+
+  async getPerformanceConfig() {
+    const response = await fetch(`${API_BASE_URL}/performance/config`)
+    if (!response.ok) throw new Error('Error al obtener configuración')
+    return response.json()
+  },
+
+  async updatePerformanceConfig(config) {
+    const response = await fetch(`${API_BASE_URL}/performance/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    })
+    if (!response.ok) throw new Error('Error al actualizar configuración')
+    return response.json()
+  },
+
+  async getCacheStats() {
+    const response = await fetch(`${API_BASE_URL}/performance/cache`)
+    if (!response.ok) throw new Error('Error al obtener stats de caché')
+    return response.json()
+  },
+
+  async getAdaptiveStreamConfig(networkSpeed) {
+    const response = await fetch(`${API_BASE_URL}/performance/adaptive-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ networkSpeed })
+    })
+    if (!response.ok) throw new Error('Error al obtener config adaptativa')
     return response.json()
   }
 }

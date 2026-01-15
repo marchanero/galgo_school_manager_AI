@@ -123,11 +123,13 @@ model RuleExecution {
 
 model MqttConfig {
   id          Int      @id @default(autoincrement())
+  name        String   @default("Servidor Principal") // Nombre descriptivo del servidor
   broker      String   @default("mqtt://100.82.84.24:1883")
   username    String   @default("admin")
   password    String   @default("galgo2526")
   clientId    String   @default("camera_rtsp_server")
-  isActive    Boolean  @default(true)
+  isActive    Boolean  @default(false) // Solo uno activo a la vez
+  isDefault   Boolean  @default(false) // Marca el servidor por defecto
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

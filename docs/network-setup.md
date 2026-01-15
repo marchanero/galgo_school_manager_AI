@@ -148,6 +148,51 @@ ffprobe rtsp://admin:password@192.168.8.210:554/stream1
 
 ---
 
+## Configuración Dual: WiFi + USB Ethernet
+
+### Escenario
+- **WiFi (wlo1)** → Internet (backup si falla el cable)
+- **Cable Ethernet (enp1s0)** → Internet (principal)
+- **USB Ethernet (enx00e04c36022a)** → Sensores/Cámaras
+
+### Configuración Automática de Failover
+
+Linux gestiona automáticamente el failover mediante métricas de ruta:
+
+```
+default via 192.168.1.1 dev enp1s0 metric 101   ← Prioridad ALTA
+default via 192.168.1.1 dev wlo1   metric 600   ← Backup automático
+```
+
+### Conectar WiFi como Backup
+
+```bash
+# Conectar a la red WiFi
+sudo nmcli device wifi connect "NOMBRE_RED" password "CONTRASEÑA"
+
+# Verificar conexiones activas
+nmcli device status
+
+# Verificar rutas
+ip route show
+```
+
+### Tabla de Interfaces
+
+| Interfaz | IP | Uso | Prioridad |
+|----------|-----|-----|-----------|
+| **enp1s0** (Cable) | 192.168.1.x | 🌐 Internet | Alta (metric 101) |
+| **wlo1** (WiFi) | 192.168.1.x | 🌐 Internet (backup) | Baja (metric 600) |
+| **enx00e04c36022a** (USB) | 192.168.50.1 | 📹 Sensores | Dedicado |
+
+### Comportamiento Esperado
+
+1. **Con cable conectado**: Internet va por cable (más rápido)
+2. **Sin cable**: Internet automáticamente por WiFi
+3. **Sensores**: Siempre por USB Ethernet (independiente)
+
+---
+
 ## Solución de Problemas
 
 ### Error: "No route to host"
@@ -172,6 +217,68 @@ sudo ip route add 192.168.8.0/24 via 192.168.50.2 dev <INTERFAZ>
 ```bash
 # Usar algoritmos legacy
 ssh -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa root@192.168.50.2
+```
+
+### La ruta a sensores se pierde al reiniciar
+
+**Solución Definitiva: Servicio Systemd (RECOMENDADO)**
+
+```bash
+# 1. Crear servicio systemd
+sudo tee /etc/systemd/system/sensor-route.service << 'EOF'
+[Unit]
+Description=Add route to sensor/camera network via GL.iNet router
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'sleep 5 && ip route add 192.168.8.0/24 via 192.168.50.2 dev enx00e04c36022a 2>/dev/null || true'
+ExecStop=/bin/bash -c 'ip route del 192.168.8.0/24 via 192.168.50.2 2>/dev/null || true'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 2. Habilitar y arrancar el servicio
+sudo systemctl daemon-reload
+sudo systemctl enable sensor-route.service
+sudo systemctl start sensor-route.service
+
+# 3. Verificar estado
+sudo systemctl status sensor-route.service
+```
+
+**Solución Alternativa: networkd-dispatcher**
+
+```bash
+# Crear script de persistencia
+sudo mkdir -p /etc/networkd-dispatcher/routable.d
+
+sudo tee /etc/networkd-dispatcher/routable.d/50-sensor-route << 'EOF'
+#!/bin/bash
+# Ruta hacia la red de sensores y cámaras via GL.iNet Router
+SENSOR_NETWORK="192.168.8.0/24"
+ROUTER_IP="192.168.50.2"
+USB_INTERFACE="enx00e04c36022a"
+
+if ip link show "$USB_INTERFACE" | grep -q "state UP"; then
+    ip route add $SENSOR_NETWORK via $ROUTER_IP dev $USB_INTERFACE 2>/dev/null || true
+    logger "Sensor route added: $SENSOR_NETWORK via $ROUTER_IP"
+fi
+EOF
+
+sudo chmod +x /etc/networkd-dispatcher/routable.d/50-sensor-route
+```
+
+**Verificación rápida después de reiniciar:**
+```bash
+# Comprobar ruta
+ip route show | grep 192.168.8
+
+# Probar conectividad a la cámara
+ping -c 2 192.168.8.210
 ```
 
 ---
@@ -211,6 +318,7 @@ ROUTER_PASS=your_password
 2. **Reinicio de Ubuntu**: El script en `/etc/networkd-dispatcher/` añade la ruta automáticamente
 3. **Nuevos dispositivos**: Cualquier dispositivo en `192.168.8.x` será accesible automáticamente
 4. **Seguridad**: El tráfico interno no pasa por NAT, manteniendo las IPs originales
+5. **Failover WiFi**: Si se desconecta el cable, Internet pasa automáticamente a WiFi
 
 ---
 
@@ -219,3 +327,4 @@ ROUTER_PASS=your_password
 - [OpenWRT Firewall](https://openwrt.org/docs/guide-user/firewall/firewall_configuration)
 - [GL.iNet Docs](https://docs.gl-inet.com/)
 - [Ubuntu Networkd-dispatcher](https://manpages.ubuntu.com/manpages/focal/man8/networkd-dispatcher.8.html)
+- [NetworkManager nmcli](https://networkmanager.dev/docs/api/latest/nmcli.html)

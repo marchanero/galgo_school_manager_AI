@@ -14,10 +14,18 @@ import scenarioRoutes from './routes/scenarios.js'
 import sensorRoutes from './routes/sensors.js'
 import replicationRoutes from './routes/replication.js'
 import emqxRoutes from './routes/emqx.js'
+import storageRoutes from './routes/storage.js'
+import recordingsRoutes from './routes/recordings.js'
+import processingRoutes from './routes/processing.js'
+import performanceRoutes from './routes/performance.js'
 import StreamingService from './utils/streamingService.js'
 import mediaServerManager from './services/mediaServer.js'
+import recordingManager from './services/recordingManager.js'
+import videoProcessor from './services/videoProcessor.js'
+import performanceManager from './services/performanceManager.js'
 import mqttService from './services/mqttService.js'
 import replicationService from './services/replicationService.js'
+import storageManager from './services/storageManager.js'
 
 dotenv.config()
 
@@ -92,6 +100,141 @@ mediaServerManager.start().then(() => {
   console.log('✅ Sistema de grabación y streaming iniciado')
 }).catch((error) => {
   console.error('❌ Error iniciando Media Server:', error)
+})
+
+// Inicializar Performance Manager (detección de hardware y optimización)
+performanceManager.initialize().then(() => {
+  console.log('✅ Sistema de rendimiento inicializado')
+}).catch((error) => {
+  console.error('❌ Error inicializando Performance Manager:', error)
+})
+
+// Inicializar Storage Manager para gestión de almacenamiento
+storageManager.start()
+
+// Escuchar eventos de RecordingManager
+recordingManager.on('recordingStarted', (data) => {
+  console.log(`📹 Grabación iniciada: ${data.cameraName}`)
+  mqttService.publish('camera_rtsp/recordings/started', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando inicio grabación:', err))
+})
+
+recordingManager.on('recordingStopped', async (data) => {
+  console.log(`⏹️ Grabación detenida: ${data.cameraName}`)
+  mqttService.publish('camera_rtsp/recordings/stopped', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando parada grabación:', err))
+  
+  // Generar thumbnails automáticamente
+  if (data.outputDir) {
+    try {
+      // Esperar a que el archivo se escriba completamente
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      const fs = await import('fs')
+      const path = await import('path')
+      
+      if (fs.existsSync(data.outputDir)) {
+        const files = fs.readdirSync(data.outputDir)
+          .filter(f => f.endsWith('.mp4'))
+          .sort()
+        
+        if (files.length > 0) {
+          const latestVideo = files[files.length - 1]
+          const videoPath = path.join(data.outputDir, latestVideo)
+          
+          console.log(`🖼️ Generando thumbnail para: ${latestVideo}`)
+          videoProcessor.addToQueue({
+            type: 'thumbnail',
+            videoPath,
+            options: { timestamp: '00:00:03' },
+            priority: 1,
+            cameraId: data.cameraId
+          })
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Error generando thumbnail:`, error.message)
+    }
+  }
+})
+
+recordingManager.on('recordingFailed', (data) => {
+  console.log(`❌ Grabación falló: ${data.cameraName} - ${data.reason}`)
+  mqttService.publish('camera_rtsp/recordings/failed', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando fallo grabación:', err))
+})
+
+recordingManager.on('recordingAbandoned', (data) => {
+  console.log(`🚫 Grabación abandonada: ${data.cameraName} tras ${data.totalAttempts} intentos`)
+  mqttService.publish('camera_rtsp/recordings/abandoned', {
+    ...data,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando abandono grabación:', err))
+})
+
+// Escuchar eventos de VideoProcessor
+videoProcessor.on('taskCompleted', (task) => {
+  console.log(`✅ Tarea completada: ${task.type} - ${task.id}`)
+  mqttService.publish('camera_rtsp/processing/completed', {
+    taskId: task.id,
+    type: task.type,
+    result: task.result,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando tarea completada:', err))
+})
+
+videoProcessor.on('taskFailed', (task) => {
+  console.log(`❌ Tarea fallida: ${task.type} - ${task.error}`)
+  mqttService.publish('camera_rtsp/processing/failed', {
+    taskId: task.id,
+    type: task.type,
+    error: task.error,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando tarea fallida:', err))
+})
+
+videoProcessor.on('compressionProgress', (data) => {
+  // Solo publicar cada 10% para no saturar
+  if (data.progress % 10 === 0) {
+    mqttService.publish('camera_rtsp/processing/progress', {
+      ...data,
+      timestamp: new Date().toISOString()
+    }).catch(err => {})
+  }
+})
+
+// Escuchar eventos de almacenamiento
+storageManager.on('alertLevelChanged', ({ previousLevel, currentLevel, diskInfo }) => {
+  console.log(`⚠️ ALERTA DE DISCO: ${previousLevel} → ${currentLevel}`)
+  console.log(`   Uso: ${diskInfo.usePercent}%, Disponible: ${diskInfo.availableFormatted}`)
+  
+  // Publicar alerta por MQTT
+  mqttService.publish('camera_rtsp/system/storage/alert', {
+    level: currentLevel,
+    previousLevel,
+    diskUsage: diskInfo.usePercent,
+    available: diskInfo.available,
+    availableFormatted: diskInfo.availableFormatted,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando alerta MQTT:', err))
+})
+
+storageManager.on('cleanupCompleted', ({ deletedFiles, freedSpace, freedSpaceFormatted }) => {
+  console.log(`🧹 Limpieza completada: ${deletedFiles} archivos, ${freedSpaceFormatted} liberados`)
+  
+  // Publicar evento por MQTT
+  mqttService.publish('camera_rtsp/system/storage/cleanup', {
+    deletedFiles,
+    freedSpace,
+    freedSpaceFormatted,
+    timestamp: new Date().toISOString()
+  }).catch(err => console.error('Error publicando limpieza MQTT:', err))
 })
 
 // Inicializar MQTT Service
@@ -243,6 +386,14 @@ app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/sensors', sensorRoutes)
 app.use('/api/replication', replicationRoutes)
 app.use('/api/emqx', emqxRoutes)
+app.use('/api/storage', storageRoutes)
+app.use('/api/recordings', recordingsRoutes)
+app.use('/api/processing', processingRoutes)
+app.use('/api/performance', performanceRoutes)
+
+// Servir archivos estáticos de thumbnails y clips
+app.use('/thumbnails', express.static(path.join(process.cwd(), 'thumbnails')))
+app.use('/clips', express.static(path.join(process.cwd(), 'clips')))
 
 // Ruta de health check
 app.get('/health', (req, res) => {
@@ -276,20 +427,29 @@ const gracefulShutdown = async (signal) => {
   console.log(`\n🛑 Señal ${signal} recibida. Cerrando servidor...`)
   
   try {
-    // 1. Detener nuevas conexiones
+    // 1. Detener monitoreo de almacenamiento
+    console.log('💾 Deteniendo monitoreo de almacenamiento...')
+    storageManager.stop()
+    
+    // 2. Detener nuevas conexiones
     console.log('📡 Cerrando servicios de streaming...')
     streamingService.closeAll()
     webrtcService.stopAll()
     
-    // 2. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
+    // 3. Cerrar grabaciones limpiamente (CRÍTICO para evitar pérdida de datos)
     console.log('💾 Guardando grabaciones en curso...')
     await mediaServerManager.gracefulStop()
+    await recordingManager.gracefulStop()
     
-    // 3. Cerrar servidor Node Media
+    // 4. Cerrar servidor Node Media
     console.log('🎬 Deteniendo servidor de medios...')
     mediaServerManager.stop()
     
-    // 4. Desconectar base de datos
+    // 5. Detener Performance Manager
+    console.log('⚡ Deteniendo sistema de rendimiento...')
+    performanceManager.stop()
+    
+    // 6. Desconectar base de datos
     console.log('🗄️ Cerrando conexión a base de datos...')
     await prisma.$disconnect()
     

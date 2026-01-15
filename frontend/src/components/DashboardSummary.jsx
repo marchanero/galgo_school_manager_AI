@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
 import { useMQTT } from '../contexts/MQTTContext'
 import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
 import CameraThumbnail from './CameraThumbnail'
+import LiveStreamThumbnail from './LiveStreamThumbnail'
+import ConfirmModal from './ConfirmModal'
 import { toast } from 'react-hot-toast'
 import { 
   Video, 
@@ -27,7 +29,11 @@ import {
   ChevronRight,
   Settings,
   Theater,
-  Maximize2
+  Maximize2,
+  Image,
+  Tv,
+  Film,
+  Gauge
 } from 'lucide-react'
 
 const DashboardSummary = () => {
@@ -38,6 +44,12 @@ const DashboardSummary = () => {
   const [recordingTab, setRecordingTab] = useState('video')
   const [cameraStatus, setCameraStatus] = useState(new Map())
   const [syncStatus, setSyncStatus] = useState({ isConnected: false, isSyncing: false })
+  // Modo de visualización: 'thumbnail' (snapshots) o 'live' (streaming)
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('dashboardViewMode') || 'thumbnail'
+  })
+  // Modal de confirmación para detener grabación
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stats, setStats] = useState({
     totalCameras: 0,
     activeCameras: 0,
@@ -65,7 +77,10 @@ const DashboardSummary = () => {
     activeRecordingsCount,
     syncRecordingStatus,
     startAllRecordings,
-    stopAllRecordings
+    stopAllRecordings,
+    getMaxElapsedSeconds,
+    getOldestStartTime,
+    initialSyncDone
   } = useRecording()
   
   const { 
@@ -85,27 +100,104 @@ const DashboardSummary = () => {
 
   const [recordingState, setRecordingState] = useState('idle')
   const [elapsedTime, setElapsedTime] = useState(0)
+  
+  // Referencia para el tiempo de inicio de grabación (para cálculo preciso)
+  const recordingStartTime = useRef(null)
+  // Referencias para funciones del contexto (evita re-renders)
+  const getMaxElapsedSecondsRef = useRef(getMaxElapsedSeconds)
+  const getOldestStartTimeRef = useRef(getOldestStartTime)
+  getMaxElapsedSecondsRef.current = getMaxElapsedSeconds
+  getOldestStartTimeRef.current = getOldestStartTime
 
-  // Timer para grabación
+  /**
+   * Calcula el tiempo transcurrido basándose en el timestamp de inicio
+   * Inmune al throttling del navegador en segundo plano
+   */
+  const calculateElapsedTime = useCallback(() => {
+    // Primero intentar obtener del contexto de recording
+    const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
+    if (syncedElapsed > 0) {
+      return syncedElapsed
+    }
+    
+    // Fallback al cálculo local
+    if (!recordingStartTime.current) return 0
+    return Math.max(0, Math.floor((Date.now() - recordingStartTime.current) / 1000))
+  }, []) // Sin dependencias - usa refs
+
+  // Timer para grabación - ahora usa cálculo basado en timestamp
   useEffect(() => {
     let interval
     if (recordingState === 'recording') {
       interval = setInterval(() => {
-        setElapsedTime(prev => prev + 1)
+        setElapsedTime(calculateElapsedTime())
       }, 1000)
+      
+      // Actualizar inmediatamente
+      setElapsedTime(calculateElapsedTime())
     }
     return () => clearInterval(interval)
-  }, [recordingState])
+  }, [recordingState, calculateElapsedTime])
 
-  // Sync con recording context
+  /**
+   * Sincroniza el tiempo cuando la página vuelve a ser visible
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && recordingState === 'recording') {
+        console.log('[DashboardSummary] Página visible, actualizando contador...')
+        setElapsedTime(calculateElapsedTime())
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [recordingState, calculateElapsedTime])
+
+  // Sync con recording context - incluye sincronización del timer desde backend
   useEffect(() => {
     if (activeRecordingsCount > 0 && recordingState === 'idle') {
       setRecordingState('recording')
+      // Sincronizar tiempo transcurrido desde el backend
+      if (initialSyncDone) {
+        const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
+        const oldestStart = getOldestStartTimeRef.current?.()
+        
+        if (oldestStart) {
+          recordingStartTime.current = new Date(oldestStart).getTime()
+        } else {
+          recordingStartTime.current = Date.now()
+        }
+        
+        if (syncedElapsed > 0) {
+          setElapsedTime(syncedElapsed)
+        } else {
+          setElapsedTime(calculateElapsedTime())
+        }
+      }
     } else if (activeRecordingsCount === 0 && recordingState === 'recording') {
       setRecordingState('idle')
+      recordingStartTime.current = null
       setElapsedTime(0)
     }
-  }, [activeRecordingsCount, recordingState])
+  }, [activeRecordingsCount, recordingState, initialSyncDone, calculateElapsedTime])
+
+  // Sincronización inicial del timer cuando se completa el sync con backend
+  useEffect(() => {
+    if (initialSyncDone && activeRecordingsCount > 0) {
+      const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
+      const oldestStart = getOldestStartTimeRef.current?.()
+      
+      if (oldestStart) {
+        recordingStartTime.current = new Date(oldestStart).getTime()
+      }
+      
+      if (syncedElapsed > 0) {
+        console.log('[DashboardSummary] Sincronizando timer desde backend:', syncedElapsed, 'segundos')
+        setElapsedTime(syncedElapsed)
+      }
+    }
+  }, [initialSyncDone, activeRecordingsCount])
 
   // Verificar estado de cámara
   const checkCameraStatus = async (cameraId) => {
@@ -338,10 +430,18 @@ const DashboardSummary = () => {
     setRecordingState('recording')
   }
 
-  const handleStopRecording = async () => {
+  // Mostrar modal de confirmación antes de detener
+  const handleStopRecordingClick = () => {
+    setShowStopConfirm(true)
+  }
+
+  // Confirmar detención de grabación
+  const handleConfirmStopRecording = async () => {
     await stopAllRecordings()
     setRecordingState('idle')
     setElapsedTime(0)
+    setShowStopConfirm(false)
+    toast.success('Grabación detenida correctamente')
   }
 
   const handleDeleteRecording = async (filename) => {
@@ -537,7 +637,7 @@ const DashboardSummary = () => {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
-                    onClick={recordingState === 'recording' ? handleStopRecording : handleStartRecording}
+                    onClick={recordingState === 'recording' ? handleStopRecordingClick : handleStartRecording}
                     disabled={cameras.length === 0}
                     className={`flex items-center justify-center w-14 h-14 rounded-full transition-all transform hover:scale-105 active:scale-95 ${
                       recordingState === 'recording'
@@ -591,6 +691,40 @@ const DashboardSummary = () => {
                 Cámaras en Vivo
               </h3>
               <div className="flex items-center gap-2">
+                {/* Toggle Thumbnail/Live */}
+                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+                  <button
+                    onClick={() => {
+                      setViewMode('thumbnail')
+                      localStorage.setItem('dashboardViewMode', 'thumbnail')
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      viewMode === 'thumbnail' 
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                    title="Vista de snapshots (menos recursos)"
+                  >
+                    <Image className="w-3 h-3" />
+                    <span className="hidden sm:inline">Snapshots</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setViewMode('live')
+                      localStorage.setItem('dashboardViewMode', 'live')
+                    }}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
+                      viewMode === 'live' 
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                    title="Streaming en vivo (más fluido)"
+                  >
+                    <Tv className="w-3 h-3" />
+                    <span className="hidden sm:inline">Live</span>
+                  </button>
+                </div>
+                
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {stats.activeCameras}/{stats.totalCameras} activas
                 </span>
@@ -616,14 +750,18 @@ const DashboardSummary = () => {
                     const status = cameraStatus.get(camera.id) || { active: false }
                     const isRecordingCamera = recordings.has(camera.id)
                     
+                    // Usar LiveStreamThumbnail o CameraThumbnail según el modo
+                    const ThumbnailComponent = viewMode === 'live' ? LiveStreamThumbnail : CameraThumbnail
+                    
                     return (
-                      <CameraThumbnail
+                      <ThumbnailComponent
                         key={camera.id}
                         camera={camera}
                         isActive={status.active}
                         isRecording={isRecordingCamera}
                         selected={selectedCameraId === camera.id}
                         onClick={() => setSelectedCameraId(camera.id)}
+                        quality="low"
                       />
                     )
                   })}
@@ -1055,8 +1193,8 @@ const DashboardSummary = () => {
               Acciones Rápidas
             </h4>
             <div className="space-y-2">
-              <button 
-                onClick={() => window.location.hash = '#camaras'}
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_TAB', tab: 'cameras' }, '*')}
                 className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="flex items-center gap-2">
@@ -1065,8 +1203,8 @@ const DashboardSummary = () => {
                 </span>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </button>
-              <button 
-                onClick={() => window.location.hash = '#escenarios'}
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'scenarios' }, '*')}
                 className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
               >
                 <span className="flex items-center gap-2">
@@ -1075,10 +1213,73 @@ const DashboardSummary = () => {
                 </span>
                 <ChevronRight className="w-4 h-4 text-gray-400" />
               </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'recordings' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Film className="w-4 h-4 text-red-500" />
+                  Ver Grabaciones
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'storage' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-orange-500" />
+                  Estado de Almacenamiento
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={() => window.parent?.postMessage?.({ type: 'NAVIGATE_CONFIG', subTab: 'performance' }, '*')}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-emerald-500" />
+                  Rendimiento del Sistema
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/recordings/memory-config')
+                    const data = await response.json()
+                    if (data.success) {
+                      const config = data.memoryOptimizations
+                      toast.success(`Configuración de memoria: Segmentos ${config.segmentTime}, Buffer ${config.inputBufferSize}`)
+                    }
+                  } catch (error) {
+                    toast.error('Error obteniendo configuración de memoria')
+                  }
+                }}
+                className="w-full flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-cyan-500" />
+                  Ver Config Memoria
+                </span>
+                <ChevronRight className="w-4 h-4 text-gray-400" />
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación para detener grabación */}
+      <ConfirmModal
+        isOpen={showStopConfirm}
+        onClose={() => setShowStopConfirm(false)}
+        onConfirm={handleConfirmStopRecording}
+        title="Detener Grabación"
+        message={`¿Estás seguro de que deseas detener la grabación? Se están grabando ${activeRecordingsCount} cámara${activeRecordingsCount !== 1 ? 's' : ''} y datos de sensores. La grabación actual de ${formatTime(elapsedTime)} se guardará.`}
+        confirmText="Sí, detener"
+        cancelText="Continuar grabando"
+        isDanger={true}
+      />
     </div>
   )
 }

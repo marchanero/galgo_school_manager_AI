@@ -10,8 +10,12 @@ import RulesManager from './components/RulesManager'
 import DashboardSummary from './components/DashboardSummary'
 import ScenarioManager from './components/ScenarioManager'
 import SensorManager from './components/SensorManager'
-import ReplicationStats from './components/ReplicationStats'
-import ReplicationConfig from './components/ReplicationConfig'
+import BackupPanel from './components/BackupPanel'
+import StorageManager from './components/StorageManager'
+import RecordingDashboard from './components/RecordingDashboard'
+import VideoProcessing from './components/VideoProcessing'
+import PerformanceDashboard from './components/PerformanceDashboard'
+import MQTTConfig from './components/MQTTConfig'
 import { ListItemSkeleton } from './components/ui/Skeleton'
 import api from './services/api'
 import { ThemeProvider, useTheme } from './contexts/ThemeContext'
@@ -36,7 +40,11 @@ import {
   Dog,
   Theater,
   Radio,
-  FolderSync
+  FolderSync,
+  HardDrive,
+  Film,
+  Clapperboard,
+  Gauge
 } from 'lucide-react'
 
 // Componente Header separado
@@ -131,14 +139,24 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
   const configTabs = [
     { id: 'scenarios', label: 'Escenarios', icon: Theater, color: 'blue' },
     { id: 'sensors', label: 'Sensores', icon: Radio, color: 'green' },
-    { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' }
+    { id: 'mqtt', label: 'MQTT', icon: Wifi, color: 'violet' },
+    { id: 'replication', label: 'Replicación', icon: FolderSync, color: 'purple' },
+    { id: 'storage', label: 'Almacenamiento', icon: HardDrive, color: 'orange' },
+    { id: 'recordings', label: 'Grabaciones', icon: Film, color: 'red' },
+    { id: 'processing', label: 'Procesamiento', icon: Clapperboard, color: 'cyan' },
+    { id: 'performance', label: 'Rendimiento', icon: Gauge, color: 'emerald' }
   ]
 
   const getTabClasses = (tab, isActive) => {
     const colors = {
       blue: isActive ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20' : '',
       green: isActive ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400 bg-green-50 dark:bg-green-900/20' : '',
-      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : ''
+      violet: isActive ? 'text-violet-600 dark:text-violet-400 border-b-2 border-violet-600 dark:border-violet-400 bg-violet-50 dark:bg-violet-900/20' : '',
+      purple: isActive ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400 bg-purple-50 dark:bg-purple-900/20' : '',
+      orange: isActive ? 'text-orange-600 dark:text-orange-400 border-b-2 border-orange-600 dark:border-orange-400 bg-orange-50 dark:bg-orange-900/20' : '',
+      red: isActive ? 'text-red-600 dark:text-red-400 border-b-2 border-red-600 dark:border-red-400 bg-red-50 dark:bg-red-900/20' : '',
+      cyan: isActive ? 'text-cyan-600 dark:text-cyan-400 border-b-2 border-cyan-600 dark:border-cyan-400 bg-cyan-50 dark:bg-cyan-900/20' : '',
+      emerald: isActive ? 'text-emerald-600 dark:text-emerald-400 border-b-2 border-emerald-600 dark:border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' : ''
     }
     return isActive 
       ? colors[tab.color]
@@ -163,7 +181,7 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
 
       {/* Tabs de Configuración */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 overflow-hidden">
-        <div className="flex">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8">
           {configTabs.map(tab => {
             const Icon = tab.icon
             const isActive = configSubTab === tab.id
@@ -171,11 +189,11 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
               <button
                 key={tab.id}
                 onClick={() => setConfigSubTab(tab.id)}
-                className={`flex-1 px-6 py-4 font-medium transition-all duration-200 ${getTabClasses(tab, isActive)}`}
+                className={`px-3 py-3 font-medium transition-all duration-200 text-sm ${getTabClasses(tab, isActive)}`}
               >
-                <div className="flex items-center justify-center gap-2">
-                  <Icon className={`w-5 h-5 ${isActive ? '' : 'opacity-70'}`} />
-                  <span>{tab.label}</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Icon className={`w-4 h-4 ${isActive ? '' : 'opacity-70'}`} />
+                  <span className="truncate">{tab.label}</span>
                 </div>
               </button>
             )
@@ -187,12 +205,12 @@ function ConfigurationContent({ configSubTab, setConfigSubTab }) {
       <div className="mt-6">
         {configSubTab === 'scenarios' && <ScenarioManager />}
         {configSubTab === 'sensors' && <SensorManager />}
-        {configSubTab === 'replication' && (
-          <div className="space-y-6">
-            <ReplicationStats />
-            <ReplicationConfig />
-          </div>
-        )}
+        {configSubTab === 'mqtt' && <MQTTConfig />}
+        {configSubTab === 'replication' && <BackupPanel />}
+        {configSubTab === 'storage' && <StorageManager />}
+        {configSubTab === 'recordings' && <RecordingDashboard />}
+        {configSubTab === 'processing' && <VideoProcessing />}
+        {configSubTab === 'performance' && <PerformanceDashboard />}
       </div>
     </div>
   )
@@ -258,6 +276,21 @@ function AppContent() {
   useEffect(() => {
     localStorage.setItem('configSubTab', configSubTab)
   }, [configSubTab])
+
+  // Listener para navegación desde acciones rápidas del dashboard
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data?.type === 'NAVIGATE_TAB') {
+        setActiveTab(event.data.tab)
+      } else if (event.data?.type === 'NAVIGATE_CONFIG') {
+        setActiveTab('config')
+        setConfigSubTab(event.data.subTab)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   // Advertir al usuario si hay grabaciones activas antes de cerrar/recargar
   useEffect(() => {

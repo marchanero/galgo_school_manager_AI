@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRecording } from '../contexts/RecordingContext'
 import { useScenario } from '../contexts/ScenarioContext'
 import api from '../services/api'
@@ -19,6 +19,14 @@ const RecordingControlGlobal = () => {
   const [pausedTime, setPausedTime] = useState(0)
   const [totalRecordingTime, setTotalRecordingTime] = useState(0)
   const [pausedAt, setPausedAt] = useState(null)
+  
+  // Referencias para cálculo preciso del tiempo
+  const recordingStartTime = useRef(null)
+  const pauseStartTime = useRef(null)
+  const totalPausedDuration = useRef(0)
+  // Referencia para recordings (evita re-renders infinitos)
+  const recordingsRef = useRef(recordings)
+  recordingsRef.current = recordings
 
   // Cargar cámaras al montar el componente
   useEffect(() => {
@@ -34,35 +42,159 @@ const RecordingControlGlobal = () => {
     fetchCameras()
   }, [])
 
-  // Timer effect
+  /**
+   * Calcula el tiempo transcurrido basándose en timestamps reales
+   * Esto es inmune al throttling del navegador cuando la pestaña está en segundo plano
+   */
+  const calculateElapsedTime = useCallback(() => {
+    if (!recordingStartTime.current) return 0
+    
+    const now = Date.now()
+    let elapsed = Math.floor((now - recordingStartTime.current) / 1000)
+    
+    // Restar el tiempo que estuvo pausado
+    elapsed -= Math.floor(totalPausedDuration.current / 1000)
+    
+    // Si está actualmente pausado, restar también el tiempo de pausa actual
+    if (pauseStartTime.current) {
+      elapsed -= Math.floor((now - pauseStartTime.current) / 1000)
+    }
+    
+    return Math.max(0, elapsed)
+  }, [])
+
+  /**
+   * Calcula el tiempo de pausa actual
+   */
+  const calculatePausedTime = useCallback(() => {
+    if (!pauseStartTime.current) return Math.floor(totalPausedDuration.current / 1000)
+    
+    const now = Date.now()
+    const currentPauseDuration = now - pauseStartTime.current
+    return Math.floor((totalPausedDuration.current + currentPauseDuration) / 1000)
+  }, [])
+
+  /**
+   * Sincroniza el tiempo con el backend
+   * Obtiene el startTime real de las grabaciones activas
+   */
+  const syncTimeWithBackend = useCallback(async () => {
+    if (recordingsRef.current.size === 0) return
+    
+    try {
+      // Obtener el startedAt más antiguo de las grabaciones activas
+      let earliestStart = null
+      for (const [, recordingInfo] of recordingsRef.current.entries()) {
+        if (recordingInfo.startedAt) {
+          const startDate = new Date(recordingInfo.startedAt)
+          if (!earliestStart || startDate < earliestStart) {
+            earliestStart = startDate
+          }
+        }
+      }
+      
+      if (earliestStart) {
+        recordingStartTime.current = earliestStart.getTime()
+        // Actualizar inmediatamente el tiempo mostrado
+        setElapsedTime(calculateElapsedTime())
+        setTotalRecordingTime(calculateElapsedTime())
+        console.log('⏱️ Tiempo sincronizado con backend, inicio:', earliestStart.toISOString())
+      }
+    } catch (error) {
+      console.error('Error sincronizando tiempo:', error)
+    }
+  }, [calculateElapsedTime]) // Removido recordings de las dependencias
+
+  // Timer effect - ahora calcula el tiempo real en lugar de incrementar
   useEffect(() => {
     let interval
-    if (recordingState === 'recording') {
+    if (recordingState === 'recording' || recordingState === 'paused') {
+      // Actualizar cada segundo basándose en el tiempo real
       interval = setInterval(() => {
-        setElapsedTime(prev => prev + 1)
-        setTotalRecordingTime(prev => prev + 1)
+        if (recordingState === 'recording') {
+          const elapsed = calculateElapsedTime()
+          setElapsedTime(elapsed)
+          setTotalRecordingTime(elapsed)
+        } else if (recordingState === 'paused') {
+          setPausedTime(calculatePausedTime())
+        }
       }, 1000)
-    } else if (recordingState === 'paused') {
-      interval = setInterval(() => {
-        setPausedTime(prev => prev + 1)
-      }, 1000)
+      
+      // Actualizar inmediatamente
+      if (recordingState === 'recording') {
+        const elapsed = calculateElapsedTime()
+        setElapsedTime(elapsed)
+        setTotalRecordingTime(elapsed)
+      }
     }
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [recordingState])
+  }, [recordingState, calculateElapsedTime, calculatePausedTime])
+
+  /**
+   * Maneja cuando la página vuelve a ser visible
+   * Re-sincroniza el tiempo y actualiza inmediatamente
+   */
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && recordingState === 'recording') {
+        console.log('👁️ Página visible, actualizando contador de grabación...')
+        // Sincronizar con el backend para obtener el tiempo más preciso
+        syncTimeWithBackend()
+        // Actualizar inmediatamente con el cálculo local
+        const elapsed = calculateElapsedTime()
+        setElapsedTime(elapsed)
+        setTotalRecordingTime(elapsed)
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [recordingState, calculateElapsedTime, syncTimeWithBackend])
 
   // Sync with recording context
   useEffect(() => {
     if (activeRecordingsCount > 0 && recordingState === 'idle') {
+      // Obtener el tiempo de inicio de las grabaciones activas
+      let earliestStart = null
+      for (const [, recordingInfo] of recordingsRef.current.entries()) {
+        if (recordingInfo.startedAt) {
+          const startDate = new Date(recordingInfo.startedAt)
+          if (!earliestStart || startDate < earliestStart) {
+            earliestStart = startDate
+          }
+        }
+      }
+      
+      if (earliestStart) {
+        recordingStartTime.current = earliestStart.getTime()
+      } else {
+        recordingStartTime.current = Date.now()
+      }
+      
+      totalPausedDuration.current = 0
+      pauseStartTime.current = null
       setRecordingState('recording')
+      
+      // Calcular tiempo inicial
+      const elapsed = calculateElapsedTime()
+      setElapsedTime(elapsed)
+      setTotalRecordingTime(elapsed)
+      
     } else if (activeRecordingsCount === 0 && recordingState === 'recording') {
       setRecordingState('idle')
+      recordingStartTime.current = null
+      pauseStartTime.current = null
+      totalPausedDuration.current = 0
       setElapsedTime(0)
       setPausedTime(0)
       setTotalRecordingTime(0)
     }
-  }, [activeRecordingsCount])
+  }, [activeRecordingsCount, recordingState, calculateElapsedTime]) // Removido recordings de las dependencias
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
@@ -121,6 +253,11 @@ const RecordingControlGlobal = () => {
       scenarioName: activeScenario?.name
     })
 
+    // Inicializar timestamps
+    recordingStartTime.current = Date.now()
+    pauseStartTime.current = null
+    totalPausedDuration.current = 0
+
     await startAllRecordings(cameras, {
       scenarioId: activeScenario?.id,
       scenarioName: activeScenario?.name
@@ -132,11 +269,17 @@ const RecordingControlGlobal = () => {
   }
 
   const handlePause = () => {
+    pauseStartTime.current = Date.now()
     setRecordingState('paused')
     setPausedAt(Date.now())
   }
 
   const handleResume = () => {
+    // Acumular el tiempo pausado
+    if (pauseStartTime.current) {
+      totalPausedDuration.current += Date.now() - pauseStartTime.current
+      pauseStartTime.current = null
+    }
     setRecordingState('recording')
     setPausedAt(null)
   }
@@ -144,6 +287,9 @@ const RecordingControlGlobal = () => {
   const handleStop = async () => {
     await stopAllRecordings()
     setRecordingState('idle')
+    recordingStartTime.current = null
+    pauseStartTime.current = null
+    totalPausedDuration.current = 0
     setElapsedTime(0)
     setPausedTime(0)
     setTotalRecordingTime(0)
@@ -158,6 +304,9 @@ const RecordingControlGlobal = () => {
     // Volver a idle después de 3 segundos
     setTimeout(() => {
       setRecordingState('idle')
+      recordingStartTime.current = null
+      pauseStartTime.current = null
+      totalPausedDuration.current = 0
       setElapsedTime(0)
       setPausedTime(0)
       setTotalRecordingTime(0)
