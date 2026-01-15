@@ -212,7 +212,7 @@ class MQTTController {
       })
 
       // Auto-suscribirse al topic del sensor si tiene topicBase
-      if (topicBase && mqttService.isConnected()) {
+      if (topicBase && mqttService.isConnected) {
         const subscribeTopic = `${topicBase}/#`
         mqttService.subscribe(subscribeTopic)
         console.log(`✅ Auto-suscrito a topic: ${subscribeTopic}`)
