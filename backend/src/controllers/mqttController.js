@@ -27,6 +27,25 @@ class MQTTController {
   }
 
   /**
+   * GET /api/mqtt/config
+   * Obtener configuración MQTT para el frontend (sin exponer contraseña)
+   */
+  async getConfig(req, res) {
+    try {
+      const config = mqttService.getConfig()
+      res.json({
+        success: true,
+        data: config
+      })
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
+  /**
    * POST /api/mqtt/connect
    * Conectar al broker MQTT
    */

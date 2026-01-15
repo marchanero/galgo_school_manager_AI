@@ -1,31 +1,61 @@
 import mqtt from 'mqtt'
 import { EventEmitter } from 'events'
 import { PrismaClient } from '@prisma/client'
+import { validateSensorPayload, validateRecordingCommand } from '../utils/mqttSchemas.js'
 
 const prisma = new PrismaClient()
 
 /**
  * Servicio MQTT para integración con sensores
  * Gestiona conexión, suscripciones y procesamiento de eventos
+ * 
+ * Características:
+ * - Exponential backoff para reconexión
+ * - Validación de payloads con Zod
+ * - Credenciales seguras desde variables de entorno
  */
 class MQTTService extends EventEmitter {
   constructor() {
     super()
     this.client = null
     this.isConnected = false
+    
+    // Configuración desde variables de entorno (sin hardcodear credenciales)
     this.config = {
-      broker: process.env.MQTT_BROKER || 'mqtt://100.82.84.24:1883',
-      username: process.env.MQTT_USERNAME || 'admin',
-      password: process.env.MQTT_PASSWORD || 'galgo2526',
-      clientId: `camera_rtsp_${Date.now()}`
+      broker: process.env.MQTT_BROKER || process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883',
+      username: process.env.MQTT_USERNAME || '',
+      password: process.env.MQTT_PASSWORD || '',
+      clientId: process.env.MQTT_CLIENT_ID || `camera_rtsp_${Date.now()}`,
+      wsUrl: process.env.MQTT_WS_URL || 'ws://localhost:8083/mqtt'
     }
+    
+    // Configuración de reconexión con exponential backoff
+    this.reconnectConfig = {
+      baseDelay: parseInt(process.env.MQTT_RECONNECT_BASE_DELAY) || 1000,
+      maxDelay: parseInt(process.env.MQTT_RECONNECT_MAX_DELAY) || 60000,
+      maxRetries: parseInt(process.env.MQTT_RECONNECT_MAX_RETRIES) || 10,
+      multiplier: parseInt(process.env.MQTT_RECONNECT_MULTIPLIER) || 2
+    }
+    
+    // Estado de reconexión
+    this.reconnectState = {
+      attempts: 0,
+      currentDelay: this.reconnectConfig.baseDelay,
+      isReconnecting: false,
+      lastAttempt: null,
+      timer: null
+    }
+    
     this.subscriptions = new Map()
     this.messageHandlers = new Map()
     this.statistics = {
       messagesReceived: 0,
       messagesProcessed: 0,
+      messagesValidated: 0,
+      validationErrors: 0,
       errors: 0,
-      lastMessageTime: null
+      lastMessageTime: null,
+      reconnectAttempts: 0
     }
     
     // Cargar configuración de la base de datos
@@ -43,9 +73,12 @@ class MQTTService extends EventEmitter {
           broker: dbConfig.broker,
           username: dbConfig.username,
           password: dbConfig.password,
-          clientId: dbConfig.clientId || `camera_rtsp_${Date.now()}`
+          clientId: dbConfig.clientId || `camera_rtsp_${Date.now()}`,
+          wsUrl: this.config.wsUrl // Mantener WebSocket URL
         }
         console.log('✅ Configuración MQTT cargada de la base de datos:', dbConfig.broker)
+      } else {
+        console.log('ℹ️ Usando configuración MQTT desde variables de entorno:', this.config.broker)
       }
     } catch (error) {
       console.log('⚠️ Usando configuración MQTT por defecto:', error.message)
@@ -66,14 +99,93 @@ class MQTTService extends EventEmitter {
       broker: newConfig.broker || this.config.broker,
       username: newConfig.username || this.config.username,
       password: newConfig.password || this.config.password,
-      clientId: newConfig.clientId || this.config.clientId
+      clientId: newConfig.clientId || this.config.clientId,
+      wsUrl: newConfig.wsUrl || this.config.wsUrl
     }
+    
+    // Reiniciar estado de reconexión
+    this.resetReconnectState()
     
     if (wasConnected) {
       await this.connect()
     }
     
     return this.config
+  }
+
+  /**
+   * Reinicia el estado de reconexión
+   */
+  resetReconnectState() {
+    if (this.reconnectState.timer) {
+      clearTimeout(this.reconnectState.timer)
+    }
+    this.reconnectState = {
+      attempts: 0,
+      currentDelay: this.reconnectConfig.baseDelay,
+      isReconnecting: false,
+      lastAttempt: null,
+      timer: null
+    }
+  }
+
+  /**
+   * Calcula el próximo delay con exponential backoff
+   */
+  calculateNextDelay() {
+    const { currentDelay, attempts } = this.reconnectState
+    const { maxDelay, multiplier } = this.reconnectConfig
+    
+    // Exponential backoff con jitter
+    const jitter = Math.random() * 0.3 + 0.85 // 85% - 115% del delay
+    const nextDelay = Math.min(currentDelay * multiplier * jitter, maxDelay)
+    
+    return Math.round(nextDelay)
+  }
+
+  /**
+   * Intenta reconexión con exponential backoff
+   */
+  scheduleReconnect() {
+    const { maxRetries } = this.reconnectConfig
+    const { attempts } = this.reconnectState
+
+    if (attempts >= maxRetries) {
+      console.error(`❌ MQTT: Máximo de reintentos alcanzado (${maxRetries}). Pausando reconexión.`)
+      this.emit('reconnect_failed', { attempts, maxRetries })
+      this.reconnectState.isReconnecting = false
+      return
+    }
+
+    if (this.reconnectState.isReconnecting) {
+      return // Ya hay una reconexión programada
+    }
+
+    this.reconnectState.isReconnecting = true
+    const delay = this.calculateNextDelay()
+    this.reconnectState.currentDelay = delay
+
+    console.log(`🔄 MQTT: Reconexión programada en ${delay}ms (intento ${attempts + 1}/${maxRetries})`)
+    this.emit('reconnect_scheduled', { delay, attempt: attempts + 1, maxRetries })
+
+    this.reconnectState.timer = setTimeout(async () => {
+      this.reconnectState.attempts++
+      this.reconnectState.lastAttempt = new Date()
+      this.statistics.reconnectAttempts++
+
+      try {
+        await this.connect()
+        // Conexión exitosa - reiniciar estado
+        this.resetReconnectState()
+        console.log('✅ MQTT: Reconexión exitosa')
+        this.emit('reconnect_success', { attempts: this.reconnectState.attempts })
+      } catch (error) {
+        console.error(`❌ MQTT: Reconexión fallida:`, error.message)
+        this.reconnectState.isReconnecting = false
+        // Programar siguiente intento
+        this.scheduleReconnect()
+      }
+    }, delay)
   }
 
   /**
@@ -85,6 +197,11 @@ class MQTTService extends EventEmitter {
       return { success: true, broker: this.config.broker }
     }
 
+    // Validar que hay credenciales configuradas
+    if (!this.config.broker) {
+      throw new Error('MQTT_BROKER no configurado. Revisa las variables de entorno.')
+    }
+
     return new Promise((resolve, reject) => {
       try {
         console.log(`🔌 Conectando a MQTT: ${this.config.broker}`)
@@ -94,7 +211,7 @@ class MQTTService extends EventEmitter {
           username: this.config.username,
           password: this.config.password,
           clean: true,
-          reconnectPeriod: 5000,
+          reconnectPeriod: 0, // Desactivar reconexión automática (usamos nuestro backoff)
           connectTimeout: 30000,
           keepalive: 60
         })
@@ -102,6 +219,7 @@ class MQTTService extends EventEmitter {
         this.client.on('connect', () => {
           console.log('✅ Conectado a MQTT broker')
           this.isConnected = true
+          this.resetReconnectState() // Éxito - reiniciar backoff
           this.emit('connected')
           
           // Auto-suscribirse a tópicos base
@@ -118,18 +236,28 @@ class MQTTService extends EventEmitter {
           console.error('❌ Error MQTT:', error.message)
           this.statistics.errors++
           this.emit('error', error)
-          reject(error)
+          
+          // No rechazar si ya estamos conectados (error transitorio)
+          if (!this.isConnected) {
+            reject(error)
+          }
         })
 
         this.client.on('close', () => {
           console.log('🔌 Conexión MQTT cerrada')
+          const wasConnected = this.isConnected
           this.isConnected = false
           this.emit('disconnected')
+          
+          // Iniciar reconexión si estábamos conectados
+          if (wasConnected && !this.reconnectState.isReconnecting) {
+            this.scheduleReconnect()
+          }
         })
 
-        this.client.on('reconnect', () => {
-          console.log('🔄 Reconectando a MQTT...')
-          this.emit('reconnecting')
+        this.client.on('offline', () => {
+          console.log('📴 MQTT offline')
+          this.emit('offline')
         })
 
       } catch (error) {
@@ -231,7 +359,7 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Manejar mensajes recibidos
+   * Manejar mensajes recibidos con validación
    */
   async handleMessage(topic, message) {
     try {
@@ -274,18 +402,13 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Procesar datos de sensores
+   * Procesar datos de sensores con validación Zod
    */
   async processSensorData(topic, data) {
     try {
       // Extraer tipo de sensor y ID del tópico
-      // Formato: camera_rtsp/sensors/{type}/{sensor_id}
-      // O: camera_rtsp/sensors/{category}/{type}/{sensor_id} (ej: gases/no2/NO2001)
       const parts = topic.split('/')
-      
-      // El último elemento es siempre el sensor_id
       const sensorId = parts[parts.length - 1]
-      // Todo lo que está entre 'sensors/' y el sensor_id es el tipo
       const sensorType = parts.slice(2, -1).join('/')
 
       if (!sensorType || !sensorId) {
@@ -294,6 +417,27 @@ class MQTTService extends EventEmitter {
       }
 
       console.log(`🌡️ Procesando ${sensorType} de sensor ${sensorId}`)
+
+      // ═══════════════════════════════════════════════════════════════
+      // VALIDACIÓN CON ZOD
+      // ═══════════════════════════════════════════════════════════════
+      const validation = validateSensorPayload(sensorType, data)
+      
+      if (!validation.success) {
+        console.warn(`⚠️ Payload inválido para sensor ${sensorId}:`, validation.error)
+        this.statistics.validationErrors++
+        this.emit('validation_error', { 
+          sensorId, 
+          sensorType, 
+          error: validation.error, 
+          data 
+        })
+        // Continuar procesando pero con advertencia
+        // Opcional: return aquí para rechazar payloads inválidos
+      } else {
+        this.statistics.messagesValidated++
+        data = validation.data // Usar datos normalizados por Zod
+      }
 
       // Buscar o crear sensor en BD
       let sensor = await prisma.sensor.findUnique({
@@ -427,24 +571,31 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Ejecutar acción de regla
+   * Ejecutar acción de regla con validación
    */
   async executeAction(rule, action, sensorData) {
     try {
       console.log(`🎬 Ejecutando acción: ${action.type}`)
 
+      // Validar comando antes de ejecutar
+      const commandData = {
+        command: action.type === 'start_recording' ? 'start' : 'stop',
+        rule: rule.name,
+        ruleId: rule.id,
+        sensorData,
+        duration: action.duration || null,
+        timestamp: new Date().toISOString()
+      }
+
+      const validation = validateRecordingCommand(commandData)
+      if (!validation.success) {
+        console.error(`❌ Comando inválido:`, validation.error)
+        throw new Error(`Comando inválido: ${validation.error}`)
+      }
+
       if (action.type === 'start_recording' && action.cameras) {
         for (const cameraId of action.cameras) {
-          // Publicar comando de inicio de grabación
-          await this.publish(`camera_rtsp/cameras/${cameraId}/recording/command`, {
-            command: 'start',
-            rule: rule.name,
-            ruleId: rule.id,
-            sensorData,
-            duration: action.duration || null,
-            timestamp: new Date().toISOString()
-          })
-
+          await this.publish(`camera_rtsp/cameras/${cameraId}/recording/command`, commandData)
           console.log(`📹 Comando de grabación enviado a cámara ${cameraId}`)
         }
       } else if (action.type === 'stop_recording' && action.cameras) {
@@ -465,10 +616,19 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Procesar comandos
+   * Procesar comandos con validación
    */
   async processCommand(topic, data) {
     console.log(`⚡ Comando recibido en ${topic}:`, data)
+    
+    // Validar comando
+    const validation = validateRecordingCommand(data)
+    if (!validation.success) {
+      console.warn(`⚠️ Comando inválido recibido:`, validation.error)
+      this.statistics.validationErrors++
+      this.emit('validation_error', { topic, error: validation.error, data })
+    }
+    
     this.emit('command', { topic, data })
   }
 
@@ -494,13 +654,33 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Obtener estadísticas
+   * Obtener estadísticas incluyendo reconexión y validación
    */
   getStatistics() {
     return {
       ...this.statistics,
       isConnected: this.isConnected,
-      subscriptions: Array.from(this.subscriptions.keys())
+      subscriptions: Array.from(this.subscriptions.keys()),
+      reconnect: {
+        attempts: this.reconnectState.attempts,
+        currentDelay: this.reconnectState.currentDelay,
+        isReconnecting: this.reconnectState.isReconnecting,
+        lastAttempt: this.reconnectState.lastAttempt,
+        config: this.reconnectConfig
+      }
+    }
+  }
+
+  /**
+   * Obtener configuración (sin exponer contraseña)
+   */
+  getConfig() {
+    return {
+      broker: this.config.broker,
+      username: this.config.username,
+      clientId: this.config.clientId,
+      wsUrl: this.config.wsUrl,
+      hasPassword: !!this.config.password
     }
   }
 
@@ -508,6 +688,13 @@ class MQTTService extends EventEmitter {
    * Desconectar del broker
    */
   async disconnect() {
+    // Cancelar cualquier reconexión pendiente
+    if (this.reconnectState.timer) {
+      clearTimeout(this.reconnectState.timer)
+      this.reconnectState.timer = null
+    }
+    this.reconnectState.isReconnecting = false
+
     if (this.client) {
       console.log('🔌 Desconectando de MQTT...')
       return new Promise((resolve) => {
