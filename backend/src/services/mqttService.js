@@ -268,17 +268,41 @@ class MQTTService extends EventEmitter {
   }
 
   /**
-   * Auto-suscribirse a tópicos principales
+   * Auto-suscribirse a tópicos principales y sensores registrados
    */
   async autoSubscribe() {
-    const topics = [
-      'camera_rtsp/sensors/#',      // Todos los sensores
-      'camera_rtsp/cameras/+/command', // Comandos a cámaras
-      'camera_rtsp/rules/#'         // Eventos de reglas
-    ]
+    try {
+      // 1. Suscribirse a tópicos estáticos/sistema
+      const staticTopics = [
+        'camera_rtsp/sensors/#',      // Tópicos por defecto
+        'camera_rtsp/cameras/+/command',
+        'camera_rtsp/rules/#'
+      ]
 
-    for (const topic of topics) {
-      await this.subscribe(topic)
+      for (const topic of staticTopics) {
+        await this.subscribe(topic)
+      }
+
+      // 2. Suscribirse a todos los sensores registrados en la BD
+      const sensors = await prisma.sensor.findMany({
+        where: { isActive: true },
+        select: { topicBase: true }
+      })
+
+      const sensorTopics = sensors
+        .map(s => s.topicBase)
+        .filter(topic => topic && topic.trim() !== '')
+
+      console.log(`🔄 MQTT: Suscribiendo a ${sensorTopics.length} sensores registrados...`)
+
+      for (const baseTopic of sensorTopics) {
+        const fullTopic = baseTopic.endsWith('/') ? `${baseTopic}#` : `${baseTopic}/#`
+        await this.subscribe(fullTopic)
+      }
+
+      console.log('✅ MQTT: Auto-suscripción completada')
+    } catch (error) {
+      console.error('❌ MQTT: Error en auto-suscripción:', error.message)
     }
   }
 
