@@ -7,13 +7,13 @@ import CameraThumbnail from './CameraThumbnail'
 import LiveStreamThumbnail from './LiveStreamThumbnail'
 import ConfirmModal from './ConfirmModal'
 import { toast } from 'react-hot-toast'
-import { 
-  Video, 
-  Circle, 
-  Radio, 
-  MessageSquare, 
-  Play, 
-  Square, 
+import {
+  Video,
+  Circle,
+  Radio,
+  MessageSquare,
+  Play,
+  Square,
   Pause,
   Download,
   Trash2,
@@ -67,9 +67,9 @@ const DashboardSummary = () => {
     remoteWarningShown: false,
     remoteCriticalShown: false
   })
-  
-  const { 
-    recordings, 
+
+  const {
+    recordings,
     isRecording,
     getRecordings,
     downloadRecording,
@@ -82,25 +82,25 @@ const DashboardSummary = () => {
     getOldestStartTime,
     initialSyncDone
   } = useRecording()
-  
-  const { 
-    sensorData, 
-    messageRate, 
+
+  const {
+    sensorData,
+    messageRate,
     totalMessages,
     isConnected: mqttConnected,
-    error: mqttError 
+    error: mqttError
   } = useMQTT()
 
-  const { 
-    scenarios, 
-    activeScenario, 
+  const {
+    scenarios,
+    activeScenario,
     setActiveScenario,
-    loading: scenariosLoading 
+    loading: scenariosLoading
   } = useScenario()
 
   const [recordingState, setRecordingState] = useState('idle')
   const [elapsedTime, setElapsedTime] = useState(0)
-  
+
   // Referencia para el tiempo de inicio de grabación (para cálculo preciso)
   const recordingStartTime = useRef(null)
   // Referencias para funciones del contexto (evita re-renders)
@@ -119,7 +119,7 @@ const DashboardSummary = () => {
     if (syncedElapsed > 0) {
       return syncedElapsed
     }
-    
+
     // Fallback al cálculo local
     if (!recordingStartTime.current) return 0
     return Math.max(0, Math.floor((Date.now() - recordingStartTime.current) / 1000))
@@ -132,7 +132,7 @@ const DashboardSummary = () => {
       interval = setInterval(() => {
         setElapsedTime(calculateElapsedTime())
       }, 1000)
-      
+
       // Actualizar inmediatamente
       setElapsedTime(calculateElapsedTime())
     }
@@ -149,7 +149,7 @@ const DashboardSummary = () => {
         setElapsedTime(calculateElapsedTime())
       }
     }
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [recordingState, calculateElapsedTime])
@@ -162,13 +162,13 @@ const DashboardSummary = () => {
       if (initialSyncDone) {
         const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
         const oldestStart = getOldestStartTimeRef.current?.()
-        
+
         if (oldestStart) {
           recordingStartTime.current = new Date(oldestStart).getTime()
         } else {
           recordingStartTime.current = Date.now()
         }
-        
+
         if (syncedElapsed > 0) {
           setElapsedTime(syncedElapsed)
         } else {
@@ -187,11 +187,11 @@ const DashboardSummary = () => {
     if (initialSyncDone && activeRecordingsCount > 0) {
       const syncedElapsed = getMaxElapsedSecondsRef.current?.() || 0
       const oldestStart = getOldestStartTimeRef.current?.()
-      
+
       if (oldestStart) {
         recordingStartTime.current = new Date(oldestStart).getTime()
       }
-      
+
       if (syncedElapsed > 0) {
         console.log('[DashboardSummary] Sincronizando timer desde backend:', syncedElapsed, 'segundos')
         setElapsedTime(syncedElapsed)
@@ -218,7 +218,7 @@ const DashboardSummary = () => {
 
     const usePercent = diskInfo.usePercent
     const isLocal = diskType === 'local'
-    
+
     // Reset notifications if disk usage drops below thresholds
     if (usePercent < 70) {
       setDiskNotifications(prev => ({
@@ -276,15 +276,15 @@ const DashboardSummary = () => {
       try {
         const data = await api.getCameras()
         setCameras(data)
-        
+
         const initialStatus = new Map(
           data.map(camera => [
-            camera.id, 
+            camera.id,
             { active: camera.isActive, lastCheck: Date.now(), fromDB: true }
           ])
         )
         setCameraStatus(initialStatus)
-        
+
         // Seleccionar automáticamente la primera cámara si no hay ninguna seleccionada
         if (data.length > 0 && !selectedCameraId) {
           // Priorizar cámaras activas, o tomar la primera disponible
@@ -292,18 +292,18 @@ const DashboardSummary = () => {
           const cameraToSelect = activeCamera || data[0]
           setSelectedCameraId(cameraToSelect.id)
         }
-        
+
         data.forEach(camera => {
           syncRecordingStatus(camera.id, camera.name)
         })
-        
+
         data.forEach(async (camera) => {
           try {
             const isActive = await checkCameraStatus(camera.id)
-            setCameraStatus(prev => new Map(prev).set(camera.id, { 
-              active: isActive, 
+            setCameraStatus(prev => new Map(prev).set(camera.id, {
+              active: isActive,
               lastCheck: Date.now(),
-              fromDB: false 
+              fromDB: false
             }))
           } catch (error) {
             console.error(`Error verificando cámara ${camera.id}:`, error)
@@ -313,7 +313,7 @@ const DashboardSummary = () => {
         console.error('Error cargando cámaras:', error)
       }
     }
-    
+
     fetchCameras()
     const interval = setInterval(fetchCameras, 60000)
     return () => clearInterval(interval)
@@ -324,6 +324,7 @@ const DashboardSummary = () => {
     const fetchSyncStatus = async () => {
       try {
         const response = await fetch('/api/sync/status')
+        if (!response.ok) return // Silenciar si endpoint no existe
         const contentType = response.headers.get('content-type')
         if (contentType?.includes('application/json')) {
           const data = await response.json()
@@ -335,7 +336,7 @@ const DashboardSummary = () => {
         // Silenciar error si endpoint no existe
       }
     }
-    
+
     fetchSyncStatus()
     const interval = setInterval(fetchSyncStatus, 10000)
     return () => clearInterval(interval)
@@ -415,7 +416,7 @@ const DashboardSummary = () => {
   const loadRecordings = async (cameraId) => {
     const recordings = await getRecordings(cameraId)
     setCameraRecordings(recordings)
-    
+
     try {
       const response = await fetch(`/api/media/sensors/recordings/${cameraId}`)
       const data = await response.json()
@@ -446,7 +447,7 @@ const DashboardSummary = () => {
 
   const handleDeleteRecording = async (filename) => {
     if (!confirm(`¿Estás seguro de que quieres eliminar la grabación "${filename}"?`)) return
-    
+
     try {
       const result = await deleteRecording(selectedCameraId, filename)
       if (result.success) {
@@ -499,7 +500,7 @@ const DashboardSummary = () => {
   // Obtener sensores activos para mostrar (únicos y filtrados)
   const activeSensorsList = React.useMemo(() => {
     const uniqueSensors = new Map()
-    
+
     // Procesar sensores del contexto MQTT
     Array.from(sensorData.entries()).forEach(([sensorId, data]) => {
       // Verificar que el sensor esté activo (última actualización < 10 segundos)
@@ -514,7 +515,7 @@ const DashboardSummary = () => {
         })
       }
     })
-    
+
     // Convertir a array y ordenar por tipo/nombre
     return Array.from(uniqueSensors.values())
       .sort((a, b) => a.type.localeCompare(b.type))
@@ -545,7 +546,7 @@ const DashboardSummary = () => {
                 </button>
               )}
             </div>
-            
+
             {activeScenario && (
               <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <span className="flex items-center gap-1">
@@ -561,21 +562,18 @@ const DashboardSummary = () => {
           </div>
 
           {/* Timer de grabación */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
-            recordingState === 'recording' 
-              ? 'bg-red-50 dark:bg-red-900/20' 
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${recordingState === 'recording'
+              ? 'bg-red-50 dark:bg-red-900/20'
               : 'bg-gray-50 dark:bg-gray-700/50'
-          }`}>
-            <Clock className={`w-4 h-4 ${
-              recordingState === 'recording' 
-                ? 'text-red-500' 
-                : 'text-gray-400'
-            }`} />
-            <span className={`font-mono text-sm font-medium ${
-              recordingState === 'recording' 
-                ? 'text-red-600 dark:text-red-400' 
-                : 'text-gray-500 dark:text-gray-400'
             }`}>
+            <Clock className={`w-4 h-4 ${recordingState === 'recording'
+                ? 'text-red-500'
+                : 'text-gray-400'
+              }`} />
+            <span className={`font-mono text-sm font-medium ${recordingState === 'recording'
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-gray-500 dark:text-gray-400'
+              }`}>
               {formatTime(elapsedTime)}
             </span>
             {recordingState === 'recording' && (
@@ -589,11 +587,10 @@ const DashboardSummary = () => {
           {/* Status indicators */}
           <div className="flex items-center gap-2">
             {/* MQTT Status */}
-            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-              mqttConnected 
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' 
+            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${mqttConnected
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
                 : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-            }`}>
+              }`}>
               {mqttConnected ? (
                 <Wifi className="w-3.5 h-3.5" />
               ) : (
@@ -603,13 +600,12 @@ const DashboardSummary = () => {
             </div>
 
             {/* Sync Status */}
-            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
-              syncStatus.isSyncing 
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' 
+            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${syncStatus.isSyncing
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
                 : syncStatus.isConnected
                   ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
                   : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
+              }`}>
               <RefreshCw className={`w-3.5 h-3.5 ${syncStatus.isSyncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </div>
@@ -621,29 +617,27 @@ const DashboardSummary = () => {
           MAIN LAYOUT - Dos columnas
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        
+
         {/* ═══════════════════════════════════════════════════════════════════
             COLUMNA IZQUIERDA - Cámaras y Control de Grabación (2/3)
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="lg:col-span-2 space-y-4">
-          
+
           {/* Control de Grabación Principal */}
-          <div className={`rounded-xl shadow-sm border overflow-hidden transition-all ${
-            recordingState === 'recording'
+          <div className={`rounded-xl shadow-sm border overflow-hidden transition-all ${recordingState === 'recording'
               ? 'bg-gradient-to-r from-red-500 to-red-600 border-red-400'
               : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-          }`}>
+            }`}>
             <div className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={recordingState === 'recording' ? handleStopRecordingClick : handleStartRecording}
                     disabled={cameras.length === 0}
-                    className={`flex items-center justify-center w-14 h-14 rounded-full transition-all transform hover:scale-105 active:scale-95 ${
-                      recordingState === 'recording'
+                    className={`flex items-center justify-center w-14 h-14 rounded-full transition-all transform hover:scale-105 active:scale-95 ${recordingState === 'recording'
                         ? 'bg-white/20 hover:bg-white/30 text-white'
                         : 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {recordingState === 'recording' ? (
                       <Square className="w-6 h-6 fill-current" />
@@ -651,17 +645,15 @@ const DashboardSummary = () => {
                       <Play className="w-6 h-6 fill-current ml-1" />
                     )}
                   </button>
-                  
+
                   <div>
-                    <h3 className={`text-lg font-bold ${
-                      recordingState === 'recording' ? 'text-white' : 'text-gray-900 dark:text-white'
-                    }`}>
+                    <h3 className={`text-lg font-bold ${recordingState === 'recording' ? 'text-white' : 'text-gray-900 dark:text-white'
+                      }`}>
                       {recordingState === 'recording' ? 'Grabando...' : 'Iniciar Grabación'}
                     </h3>
-                    <p className={`text-sm ${
-                      recordingState === 'recording' ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'
-                    }`}>
-                      {recordingState === 'recording' 
+                    <p className={`text-sm ${recordingState === 'recording' ? 'text-red-100' : 'text-gray-500 dark:text-gray-400'
+                      }`}>
+                      {recordingState === 'recording'
                         ? `${activeRecordingsCount} cámara${activeRecordingsCount !== 1 ? 's' : ''} + sensores`
                         : `${cameras.length} cámara${cameras.length !== 1 ? 's' : ''} disponible${cameras.length !== 1 ? 's' : ''}`
                       }
@@ -698,11 +690,10 @@ const DashboardSummary = () => {
                       setViewMode('thumbnail')
                       localStorage.setItem('dashboardViewMode', 'thumbnail')
                     }}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                      viewMode === 'thumbnail' 
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${viewMode === 'thumbnail'
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
+                      }`}
                     title="Vista de snapshots (menos recursos)"
                   >
                     <Image className="w-3 h-3" />
@@ -713,18 +704,17 @@ const DashboardSummary = () => {
                       setViewMode('live')
                       localStorage.setItem('dashboardViewMode', 'live')
                     }}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${
-                      viewMode === 'live' 
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm' 
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${viewMode === 'live'
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
                         : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                    }`}
+                      }`}
                     title="Streaming en vivo (más fluido)"
                   >
                     <Tv className="w-3 h-3" />
                     <span className="hidden sm:inline">Live</span>
                   </button>
                 </div>
-                
+
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {stats.activeCameras}/{stats.totalCameras} activas
                 </span>
@@ -737,7 +727,7 @@ const DashboardSummary = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-4">
               {cameras.length === 0 ? (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
@@ -749,10 +739,10 @@ const DashboardSummary = () => {
                   {cameras.slice(0, 4).map((camera) => {
                     const status = cameraStatus.get(camera.id) || { active: false }
                     const isRecordingCamera = recordings.has(camera.id)
-                    
+
                     // Usar LiveStreamThumbnail o CameraThumbnail según el modo
                     const ThumbnailComponent = viewMode === 'live' ? LiveStreamThumbnail : CameraThumbnail
-                    
+
                     return (
                       <ThumbnailComponent
                         key={camera.id}
@@ -794,22 +784,20 @@ const DashboardSummary = () => {
               <div className="flex border-b border-gray-200 dark:border-gray-700">
                 <button
                   onClick={() => setRecordingTab('video')}
-                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                    recordingTab === 'video'
+                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${recordingTab === 'video'
                       ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }`}
+                    }`}
                 >
                   <FileVideo className="w-4 h-4 inline mr-1.5" />
                   Video ({cameraRecordings.length})
                 </button>
                 <button
                   onClick={() => setRecordingTab('sensors')}
-                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                    recordingTab === 'sensors'
+                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${recordingTab === 'sensors'
                       ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
                       : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }`}
+                    }`}
                 >
                   <Database className="w-4 h-4 inline mr-1.5" />
                   Sensores ({sensorRecordings.length})
@@ -844,7 +832,7 @@ const DashboardSummary = () => {
                               </span>
                             </div>
                           </div>
-                          
+
                           <div className="flex gap-1 ml-2">
                             <button
                               onClick={() => handleDownloadRecording(recording.filename)}
@@ -888,7 +876,7 @@ const DashboardSummary = () => {
                               </span>
                             </div>
                           </div>
-                          
+
                           <div className="flex gap-1 ml-2">
                             <button
                               onClick={() => window.open(`/api/media/sensors/download/${selectedCameraId}/${recording.filename}`, '_blank')}
@@ -912,7 +900,7 @@ const DashboardSummary = () => {
             COLUMNA DERECHA - KPIs y Sensores (1/3)
         ═══════════════════════════════════════════════════════════════════ */}
         <div className="space-y-4">
-          
+
           {/* KPIs Grid Compacto */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Cámaras */}
@@ -959,22 +947,20 @@ const DashboardSummary = () => {
             </div>
 
             {/* Disco Local */}
-            <div className={`rounded-xl p-4 border transition-all duration-300 ${
-              localDiskInfo?.usePercent > 90 
-                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' 
-                : localDiskInfo?.usePercent > 75 
-                ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-            }`}>
+            <div className={`rounded-xl p-4 border transition-all duration-300 ${localDiskInfo?.usePercent > 90
+                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                : localDiskInfo?.usePercent > 75
+                  ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className={`text-xs font-medium uppercase tracking-wide ${
-                    localDiskInfo?.usePercent > 90 
-                      ? 'text-red-600 dark:text-red-400' 
-                      : localDiskInfo?.usePercent > 75 
-                      ? 'text-yellow-600 dark:text-yellow-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                  }`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${localDiskInfo?.usePercent > 90
+                      ? 'text-red-600 dark:text-red-400'
+                      : localDiskInfo?.usePercent > 75
+                        ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
                     Disco Local
                   </p>
                   {localDiskInfo?.available ? (
@@ -983,11 +969,10 @@ const DashboardSummary = () => {
                         {localDiskInfo.availableGB}GB
                       </p>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
-                        <div 
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            localDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                            localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-300 ${localDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                              localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
                           style={{ width: `${localDiskInfo.usePercent}%` }}
                         ></div>
                       </div>
@@ -1001,41 +986,37 @@ const DashboardSummary = () => {
                     </p>
                   )}
                 </div>
-                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${
-                  localDiskInfo?.usePercent > 90 
-                    ? 'bg-red-100 dark:bg-red-900/30' 
-                    : localDiskInfo?.usePercent > 75 
-                    ? 'bg-yellow-100 dark:bg-yellow-900/30'
-                    : 'bg-orange-100 dark:bg-orange-900/30'
-                }`}>
-                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${
-                    localDiskInfo?.usePercent > 90 
-                      ? 'text-red-600 dark:text-red-400' 
-                      : localDiskInfo?.usePercent > 75 
-                      ? 'text-yellow-600 dark:text-yellow-400'
-                      : 'text-orange-600 dark:text-orange-400'
-                  }`} />
+                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${localDiskInfo?.usePercent > 90
+                    ? 'bg-red-100 dark:bg-red-900/30'
+                    : localDiskInfo?.usePercent > 75
+                      ? 'bg-yellow-100 dark:bg-yellow-900/30'
+                      : 'bg-orange-100 dark:bg-orange-900/30'
+                  }`}>
+                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${localDiskInfo?.usePercent > 90
+                      ? 'text-red-600 dark:text-red-400'
+                      : localDiskInfo?.usePercent > 75
+                        ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-orange-600 dark:text-orange-400'
+                    }`} />
                 </div>
               </div>
             </div>
 
             {/* Disco Remoto */}
-            <div className={`rounded-xl p-4 border transition-all duration-300 ${
-              remoteDiskInfo?.usePercent > 90 
-                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800' 
-                : remoteDiskInfo?.usePercent > 75 
-                ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-            }`}>
+            <div className={`rounded-xl p-4 border transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
+                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                : remoteDiskInfo?.usePercent > 75
+                  ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className={`text-xs font-medium uppercase tracking-wide ${
-                    remoteDiskInfo?.usePercent > 90 
-                      ? 'text-red-600 dark:text-red-400' 
-                      : remoteDiskInfo?.usePercent > 75 
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                  }`}>
+                  <p className={`text-xs font-medium uppercase tracking-wide ${remoteDiskInfo?.usePercent > 90
+                      ? 'text-red-600 dark:text-red-400'
+                      : remoteDiskInfo?.usePercent > 75
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
                     Disco Remoto
                   </p>
                   {remoteDiskInfo?.available ? (
@@ -1044,11 +1025,10 @@ const DashboardSummary = () => {
                         {remoteDiskInfo.availableGB}GB
                       </p>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
-                        <div 
-                          className={`h-1.5 rounded-full transition-all duration-300 ${
-                            remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                            remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-                          }`}
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-300 ${remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                              remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
                           style={{ width: `${remoteDiskInfo.usePercent}%` }}
                         ></div>
                       </div>
@@ -1067,20 +1047,18 @@ const DashboardSummary = () => {
                     </p>
                   )}
                 </div>
-                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${
-                  remoteDiskInfo?.usePercent > 90 
-                    ? 'bg-red-100 dark:bg-red-900/30' 
-                    : remoteDiskInfo?.usePercent > 75 
-                    ? 'bg-amber-100 dark:bg-amber-900/30'
-                    : 'bg-indigo-100 dark:bg-indigo-900/30'
-                }`}>
-                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${
-                    remoteDiskInfo?.usePercent > 90 
-                      ? 'text-red-600 dark:text-red-400' 
-                      : remoteDiskInfo?.usePercent > 75 
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-indigo-600 dark:text-indigo-400'
-                  }`} />
+                <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
+                    ? 'bg-red-100 dark:bg-red-900/30'
+                    : remoteDiskInfo?.usePercent > 75
+                      ? 'bg-amber-100 dark:bg-amber-900/30'
+                      : 'bg-indigo-100 dark:bg-indigo-900/30'
+                  }`}>
+                  <HardDrive className={`w-5 h-5 transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
+                      ? 'text-red-600 dark:text-red-400'
+                      : remoteDiskInfo?.usePercent > 75
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-indigo-600 dark:text-indigo-400'
+                    }`} />
                 </div>
               </div>
             </div>
@@ -1131,16 +1109,15 @@ const DashboardSummary = () => {
                 <Activity className="w-4 h-4 text-green-500" />
                 Sensores Activos
               </h3>
-              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                mqttConnected 
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' 
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mqttConnected
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
-              }`}>
+                }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
                 {mqttConnected ? 'Live' : 'Offline'}
               </span>
             </div>
-            
+
             <div className="p-4">
               {activeSensorsList.length === 0 ? (
                 <div className="text-center py-6 text-gray-500 dark:text-gray-400">
@@ -1169,7 +1146,7 @@ const DashboardSummary = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold text-gray-900 dark:text-white">
-                          {typeof sensor.value === 'object' 
+                          {typeof sensor.value === 'object'
                             ? (sensor.value?.heart_rate || sensor.value?.value || '---')
                             : sensor.value || '---'
                           }

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { 
-  Radio, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  X, 
-  RefreshCw, 
-  Thermometer, 
-  Droplets, 
-  Wind, 
+import {
+  Radio,
+  Plus,
+  Edit3,
+  Trash2,
+  X,
+  RefreshCw,
+  Thermometer,
+  Droplets,
+  Wind,
   Volume2,
   Sun,
   Activity,
@@ -79,7 +79,7 @@ const SensorManager = () => {
 
   const fetchSensors = async () => {
     try {
-      const response = await fetch('/api/sensors')
+      const response = await fetch('/api/mqtt/sensors')
       const data = await response.json()
       if (data.success) {
         setSensors(data.data)
@@ -111,22 +111,22 @@ const SensorManager = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     try {
-      const url = editingSensor 
-        ? `/api/sensors/${editingSensor.id}`
-        : '/api/sensors'
-      
+      const url = editingSensor
+        ? `/api/mqtt/sensors/${editingSensor.id}`
+        : '/api/mqtt/sensors'
+
       const method = editingSensor ? 'PUT' : 'POST'
-      
+
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
         await fetchSensors()
         handleCloseForm()
@@ -140,6 +140,11 @@ const SensorManager = () => {
   }
 
   const handleEdit = (sensor) => {
+    // Parsear variables si es string JSON
+    const parsedVariables = typeof sensor.variables === 'string'
+      ? JSON.parse(sensor.variables || '[]')
+      : (sensor.variables || [])
+
     setEditingSensor(sensor)
     setFormData({
       sensorId: sensor.sensorId,
@@ -149,7 +154,7 @@ const SensorManager = () => {
       location: sensor.location || '',
       deviceId: sensor.deviceId || '',
       topicBase: sensor.topicBase || '',
-      variables: sensor.variables || [],
+      variables: parsedVariables,
       isActive: sensor.isActive
     })
     setShowForm(true)
@@ -157,11 +162,11 @@ const SensorManager = () => {
 
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar este sensor?')) return
-    
+
     try {
-      const response = await fetch(`/api/sensors/${id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/mqtt/sensors/${id}`, { method: 'DELETE' })
       const data = await response.json()
-      
+
       if (data.success) {
         await fetchSensors()
       }
@@ -245,46 +250,48 @@ const SensorManager = () => {
         {sensors.map(sensor => {
           const typeInfo = SENSOR_TYPES[sensor.type] || { icon: Radio, label: sensor.type, color: 'blue' }
           const IconComponent = typeInfo.icon || Radio
-          
+          // Parsear variables si es string JSON
+          const variables = typeof sensor.variables === 'string'
+            ? JSON.parse(sensor.variables || '[]')
+            : (sensor.variables || [])
+
           return (
             <div
               key={sensor.id}
               className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700 hover:shadow-xl transition-all"
             >
               {/* Card Header with Color Bar */}
-              <div className={`h-1.5 ${typeInfo.color === 'rose' ? 'bg-rose-500' : 
-                typeInfo.color === 'orange' ? 'bg-orange-500' : 
-                typeInfo.color === 'blue' ? 'bg-blue-500' : 
-                typeInfo.color === 'gray' ? 'bg-gray-500' : 
-                typeInfo.color === 'indigo' ? 'bg-indigo-500' : 
-                typeInfo.color === 'purple' ? 'bg-purple-500' : 
-                typeInfo.color === 'amber' ? 'bg-amber-500' : 
-                typeInfo.color === 'teal' ? 'bg-teal-500' : 'bg-blue-500'
-              }`} />
-              
+              <div className={`h-1.5 ${typeInfo.color === 'rose' ? 'bg-rose-500' :
+                typeInfo.color === 'orange' ? 'bg-orange-500' :
+                  typeInfo.color === 'blue' ? 'bg-blue-500' :
+                    typeInfo.color === 'gray' ? 'bg-gray-500' :
+                      typeInfo.color === 'indigo' ? 'bg-indigo-500' :
+                        typeInfo.color === 'purple' ? 'bg-purple-500' :
+                          typeInfo.color === 'amber' ? 'bg-amber-500' :
+                            typeInfo.color === 'teal' ? 'bg-teal-500' : 'bg-blue-500'
+                }`} />
+
               <div className="p-5">
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      typeInfo.color === 'rose' ? 'bg-rose-100 dark:bg-rose-900/30' : 
-                      typeInfo.color === 'orange' ? 'bg-orange-100 dark:bg-orange-900/30' : 
-                      typeInfo.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30' : 
-                      typeInfo.color === 'gray' ? 'bg-gray-100 dark:bg-gray-900/30' : 
-                      typeInfo.color === 'indigo' ? 'bg-indigo-100 dark:bg-indigo-900/30' : 
-                      typeInfo.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900/30' : 
-                      typeInfo.color === 'amber' ? 'bg-amber-100 dark:bg-amber-900/30' : 
-                      typeInfo.color === 'teal' ? 'bg-teal-100 dark:bg-teal-900/30' : 'bg-blue-100 dark:bg-blue-900/30'
-                    }`}>
-                      <IconComponent className={`w-6 h-6 ${
-                        typeInfo.color === 'rose' ? 'text-rose-500' : 
-                        typeInfo.color === 'orange' ? 'text-orange-500' : 
-                        typeInfo.color === 'blue' ? 'text-blue-500' : 
-                        typeInfo.color === 'gray' ? 'text-gray-500' : 
-                        typeInfo.color === 'indigo' ? 'text-indigo-500' : 
-                        typeInfo.color === 'purple' ? 'text-purple-500' : 
-                        typeInfo.color === 'amber' ? 'text-amber-500' : 
-                        typeInfo.color === 'teal' ? 'text-teal-500' : 'text-blue-500'
-                      }`} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${typeInfo.color === 'rose' ? 'bg-rose-100 dark:bg-rose-900/30' :
+                      typeInfo.color === 'orange' ? 'bg-orange-100 dark:bg-orange-900/30' :
+                        typeInfo.color === 'blue' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                          typeInfo.color === 'gray' ? 'bg-gray-100 dark:bg-gray-900/30' :
+                            typeInfo.color === 'indigo' ? 'bg-indigo-100 dark:bg-indigo-900/30' :
+                              typeInfo.color === 'purple' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                                typeInfo.color === 'amber' ? 'bg-amber-100 dark:bg-amber-900/30' :
+                                  typeInfo.color === 'teal' ? 'bg-teal-100 dark:bg-teal-900/30' : 'bg-blue-100 dark:bg-blue-900/30'
+                      }`}>
+                      <IconComponent className={`w-6 h-6 ${typeInfo.color === 'rose' ? 'text-rose-500' :
+                        typeInfo.color === 'orange' ? 'text-orange-500' :
+                          typeInfo.color === 'blue' ? 'text-blue-500' :
+                            typeInfo.color === 'gray' ? 'text-gray-500' :
+                              typeInfo.color === 'indigo' ? 'text-indigo-500' :
+                                typeInfo.color === 'purple' ? 'text-purple-500' :
+                                  typeInfo.color === 'amber' ? 'text-amber-500' :
+                                    typeInfo.color === 'teal' ? 'text-teal-500' : 'text-blue-500'
+                        }`} />
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-white">
@@ -295,11 +302,10 @@ const SensorManager = () => {
                       </p>
                     </div>
                   </div>
-                  <span className={`px-2.5 py-1 text-xs rounded-full font-medium flex items-center gap-1 ${
-                    sensor.isActive 
-                      ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                  }`}>
+                  <span className={`px-2.5 py-1 text-xs rounded-full font-medium flex items-center gap-1 ${sensor.isActive
+                    ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}>
                     {sensor.isActive ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                     {sensor.isActive ? 'Activo' : 'Inactivo'}
                   </span>
@@ -313,7 +319,7 @@ const SensorManager = () => {
                       {sensor.sensorId}
                     </code>
                   </div>
-                  
+
                   {sensor.topicBase && (
                     <div className="flex items-start gap-2 text-gray-600 dark:text-gray-400">
                       <Link2 className="w-4 h-4 mt-0.5" />
@@ -326,13 +332,13 @@ const SensorManager = () => {
                     </div>
                   )}
 
-                  {sensor.variables && sensor.variables.length > 0 && (
+                  {variables && variables.length > 0 && (
                     <div className="flex items-start gap-2 text-gray-600 dark:text-gray-400">
                       <Tag className="w-4 h-4 mt-0.5" />
                       <div>
                         <span className="font-medium">Variables:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {sensor.variables.slice(0, 4).map((v, i) => (
+                          {variables.slice(0, 4).map((v, i) => (
                             <span
                               key={i}
                               className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded-full"
@@ -340,9 +346,9 @@ const SensorManager = () => {
                               {v}
                             </span>
                           ))}
-                          {sensor.variables.length > 4 && (
+                          {variables.length > 4 && (
                             <span className="text-xs text-gray-500 dark:text-gray-400">
-                              +{sensor.variables.length - 4} más
+                              +{variables.length - 4} más
                             </span>
                           )}
                         </div>
@@ -426,7 +432,7 @@ const SensorManager = () => {
                 <input
                   type="text"
                   value={formData.sensorId}
-                  onChange={(e) => setFormData({...formData, sensorId: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, sensorId: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="sensor_temp_001"
                   required
@@ -443,7 +449,7 @@ const SensorManager = () => {
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="Sensor Temperatura Aula 101"
                   required
@@ -464,11 +470,10 @@ const SensorManager = () => {
                         key={key}
                         type="button"
                         onClick={() => handleTypeChange(key)}
-                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${
-                          formData.type === key
-                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
-                        }`}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-2 ${formData.type === key
+                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300'
+                          }`}
                       >
                         <IconComp className={`w-5 h-5 ${formData.type === key ? 'text-emerald-500' : 'text-gray-500'}`} />
                         <span className={`text-xs font-medium ${formData.type === key ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400'}`}>
@@ -489,7 +494,7 @@ const SensorManager = () => {
                 <input
                   type="text"
                   value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   onBlur={handleGenerateTopicBase}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="aula1"
@@ -508,7 +513,7 @@ const SensorManager = () => {
                 <input
                   type="text"
                   value={formData.deviceId}
-                  onChange={(e) => setFormData({...formData, deviceId: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, deviceId: e.target.value })}
                   onBlur={handleGenerateTopicBase}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="EM:01:23:45:67:89"
@@ -525,7 +530,7 @@ const SensorManager = () => {
                   <input
                     type="text"
                     value={formData.topicBase}
-                    onChange={(e) => setFormData({...formData, topicBase: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, topicBase: e.target.value })}
                     className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl font-mono text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                     placeholder="aula1/emotibit/EM:01:23:45:67:89"
                   />
@@ -548,7 +553,7 @@ const SensorManager = () => {
                 <input
                   type="text"
                   value={formData.unit}
-                  onChange={(e) => setFormData({...formData, unit: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                   placeholder="°C, %, ppm, bpm..."
                 />
@@ -561,7 +566,7 @@ const SensorManager = () => {
                   Variables del Sensor
                 </label>
                 <div className="flex flex-wrap gap-2 mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl min-h-[52px]">
-                  {formData.variables.map((variable, index) => (
+                  {Array.isArray(formData.variables) && formData.variables.map((variable, index) => (
                     <div
                       key={index}
                       className="flex items-center gap-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg"
@@ -593,7 +598,7 @@ const SensorManager = () => {
                   type="checkbox"
                   id="isActive"
                   checked={formData.isActive}
-                  onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
                   className="w-5 h-5 rounded text-emerald-500 focus:ring-emerald-500"
                 />
                 <label htmlFor="isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">

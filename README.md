@@ -15,6 +15,8 @@ Una aplicación web moderna para visualizar streams de cámaras RTSP usando **Re
 - ✅ **Gestión de Sensores IoT (MQTT)**
 - ✅ **Escenarios y Aulas configurables**
 - ✅ **Reglas de grabación basadas en eventos**
+- ✅ **Seguridad MQTT con credenciales cifradas y validación Zod**
+- ✅ **Reconexión inteligente con exponential backoff**
 - ✅ **Sistema de replicación y backup con rclone/rsync**
 - ✅ **Persistencia de configuración de servidor en base de datos**
 - ✅ **Interfaz de configuración de backup en frontend**
@@ -127,6 +129,10 @@ La aplicación permite integrar sensores IoT vía MQTT y organizar cámaras y se
 ### Características de Sensores
 
 - **Integración MQTT Automática:** Los sensores se detectan mediante suscripción a tópicos específicos.
+- **Seguridad y Validación:** 
+  - ✅ **Validación Zod:** Todos los payloads son validados antes de ser procesados.
+  - ✅ **Credenciales Seguras:** Configuración vía variables de entorno (sin hardcodear).
+  - ✅ **Reconexión Robusta:** Implementación de exponential backoff para mayor estabilidad.
 - **Tipos de Datos:** Soporta temperatura, humedad, CO2, y métricas biométricas (EmotiBit).
 - **Dashboard en Tiempo Real:** Visualización de los últimos datos recibidos en el frontend.
 - **Umbrales:** Configuración de límites (min/max) por tipo de sensor y escenario.

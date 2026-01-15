@@ -1,7 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import mqtt from 'mqtt'
+import axios from 'axios'
 
 const MQTTContext = createContext()
+
+// API base URL
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export function MQTTProvider({ children }) {
   const [isConnected, setIsConnected] = useState(false)
@@ -12,18 +16,126 @@ export function MQTTProvider({ children }) {
   const [error, setError] = useState(null)
   const [messageRate, setMessageRate] = useState(0)
   const [totalMessages, setTotalMessages] = useState(0)
-  
+  const [config, setConfig] = useState(null)
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true)
+
+  // Estado de reconexión
+  const [reconnectState, setReconnectState] = useState({
+    attempts: 0,
+    isReconnecting: false,
+    nextRetryIn: null
+  })
+
   const clientRef = useRef(null)
   const messageHandlersRef = useRef(new Map())
   const messageCountRef = useRef(0)
   const lastRateUpdateRef = useRef(Date.now())
+  const reconnectTimerRef = useRef(null)
 
-  // Configuración MQTT
-  const config = {
-    broker: 'ws://100.82.84.24:8083/mqtt', // WebSocket port de EMQX
-    username: 'admin',
-    password: 'galgo2526'
+  // Configuración de backoff (sincronizada con backend)
+  const backoffConfig = {
+    baseDelay: 1000,
+    maxDelay: 60000,
+    maxRetries: 10,
+    multiplier: 2
   }
+  const backoffStateRef = useRef({
+    attempts: 0,
+    currentDelay: backoffConfig.baseDelay
+  })
+
+  /**
+   * Obtener configuración MQTT desde el backend
+   */
+  const fetchConfig = useCallback(async () => {
+    try {
+      setIsLoadingConfig(true)
+      const response = await axios.get(`${API_BASE}/api/mqtt/config`)
+
+      if (response.data.success) {
+        setConfig(response.data.data)
+        console.log('✅ Configuración MQTT cargada desde backend:', response.data.data.wsUrl)
+        return response.data.data
+      }
+    } catch (err) {
+      console.warn('⚠️ No se pudo cargar configuración MQTT, usando defaults:', err.message)
+      // Fallback a configuración por defecto si el backend no está disponible
+      const defaultConfig = {
+        wsUrl: import.meta.env.VITE_MQTT_WS_URL || 'ws://localhost:8083/mqtt',
+        username: '',
+        hasPassword: false
+      }
+      setConfig(defaultConfig)
+      return defaultConfig
+    } finally {
+      setIsLoadingConfig(false)
+    }
+  }, [])
+
+  /**
+   * Calcular próximo delay con exponential backoff
+   */
+  const calculateNextDelay = useCallback(() => {
+    const { currentDelay } = backoffStateRef.current
+    const jitter = Math.random() * 0.3 + 0.85
+    const nextDelay = Math.min(currentDelay * backoffConfig.multiplier * jitter, backoffConfig.maxDelay)
+    return Math.round(nextDelay)
+  }, [])
+
+  /**
+   * Reiniciar estado de backoff
+   */
+  const resetBackoff = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+    backoffStateRef.current = {
+      attempts: 0,
+      currentDelay: backoffConfig.baseDelay
+    }
+    setReconnectState({
+      attempts: 0,
+      isReconnecting: false,
+      nextRetryIn: null
+    })
+  }, [])
+
+  /**
+   * Programar reconexión con backoff
+   */
+  const scheduleReconnect = useCallback(() => {
+    const { attempts } = backoffStateRef.current
+
+    if (attempts >= backoffConfig.maxRetries) {
+      console.error(`❌ MQTT: Máximo de reintentos alcanzado (${backoffConfig.maxRetries})`)
+      setReconnectState(prev => ({ ...prev, isReconnecting: false }))
+      return
+    }
+
+    const delay = calculateNextDelay()
+    backoffStateRef.current.currentDelay = delay
+    backoffStateRef.current.attempts++
+
+    console.log(`🔄 MQTT: Reconexión en ${delay}ms (intento ${backoffStateRef.current.attempts}/${backoffConfig.maxRetries})`)
+
+    setReconnectState({
+      attempts: backoffStateRef.current.attempts,
+      isReconnecting: true,
+      nextRetryIn: delay
+    })
+
+    reconnectTimerRef.current = setTimeout(async () => {
+      try {
+        await connect()
+        resetBackoff()
+        console.log('✅ MQTT: Reconexión exitosa')
+      } catch (err) {
+        console.error('❌ MQTT: Reconexión fallida:', err.message)
+        scheduleReconnect()
+      }
+    }, delay)
+  }, [calculateNextDelay, resetBackoff])
 
   /**
    * Conectar al broker MQTT
@@ -34,25 +146,38 @@ export function MQTTProvider({ children }) {
       return
     }
 
+    // Obtener configuración si no existe
+    let mqttConfig = config
+    if (!mqttConfig) {
+      mqttConfig = await fetchConfig()
+    }
+
+    if (!mqttConfig?.wsUrl) {
+      console.error('❌ No hay URL de WebSocket MQTT configurada')
+      setError('Configuración MQTT no disponible')
+      return
+    }
+
     try {
-      console.log('🔌 Conectando a MQTT:', config.broker)
+      console.log('🔌 Conectando a MQTT:', mqttConfig.wsUrl)
       setError(null)
 
-      const client = mqtt.connect(config.broker, {
-        username: config.username,
-        password: config.password,
+      const client = mqtt.connect(mqttConfig.wsUrl, {
+        username: mqttConfig.username || '',
+        password: '', // La contraseña no se expone al frontend
         clientId: `camera_rtsp_frontend_${Date.now()}`,
         clean: true,
-        reconnectPeriod: 5000,
+        reconnectPeriod: 0, // Desactivar reconexión automática (usamos nuestro backoff)
         connectTimeout: 30000
       })
 
       client.on('connect', () => {
-        console.log('✅ Conectado a MQTT broker [v2 - Fixed]')
+        console.log('✅ Conectado a MQTT broker')
         setIsConnected(true)
         setError(null)
+        resetBackoff()
 
-        // Auto-suscribirse a tópicos (usando el cliente directamente, no la función subscribe)
+        // Auto-suscribirse a tópicos
         const topics = [
           'camera_rtsp/sensors/#',
           'camera_rtsp/cameras/+/recording/status',
@@ -82,7 +207,17 @@ export function MQTTProvider({ children }) {
 
       client.on('close', () => {
         console.log('🔌 Conexión MQTT cerrada')
+        const wasConnected = isConnected
         setIsConnected(false)
+
+        // Iniciar reconexión si estábamos conectados
+        if (wasConnected && !backoffStateRef.current.isReconnecting) {
+          scheduleReconnect()
+        }
+      })
+
+      client.on('offline', () => {
+        console.log('📴 MQTT offline')
       })
 
       client.on('reconnect', () => {
@@ -96,7 +231,7 @@ export function MQTTProvider({ children }) {
       setError(err.message)
       setIsConnected(false)
     }
-  }, [])
+  }, [config, fetchConfig, resetBackoff, scheduleReconnect, isConnected])
 
   /**
    * Suscribirse a un tópico
@@ -114,11 +249,11 @@ export function MQTTProvider({ children }) {
           reject(error)
         } else {
           console.log(`✅ Suscrito a: ${topic}`)
-          
+
           if (handler) {
             messageHandlersRef.current.set(topic, handler)
           }
-          
+
           resolve(granted)
         }
       })
@@ -241,7 +376,7 @@ export function MQTTProvider({ children }) {
   const processSensorMessage = useCallback((topic, data) => {
     console.log('🔧 processSensorMessage called:', topic, data)
     const parts = topic.split('/')
-    
+
     // El último elemento es siempre el sensor_id
     const sensorId = parts[parts.length - 1]
     // Todo lo que está entre 'sensors/' y el sensor_id es el tipo
@@ -292,13 +427,13 @@ export function MQTTProvider({ children }) {
    * Verificar si tópico coincide con patrón
    */
   const matchTopic = (topic, pattern) => {
-    const regexPattern = '^' + 
+    const regexPattern = '^' +
       pattern
-        .replace(/\//g, '\\/') 
-        .replace(/\#/g, '.*') 
+        .replace(/\//g, '\\/')
+        .replace(/\#/g, '.*')
         .replace(/\+/g, '[^/]+')
-        + '$'
-    
+      + '$'
+
     const regex = new RegExp(regexPattern)
     return regex.test(topic)
   }
@@ -315,24 +450,33 @@ export function MQTTProvider({ children }) {
    * Desconectar
    */
   const disconnect = useCallback(() => {
+    // Cancelar reconexión pendiente
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current)
+      reconnectTimerRef.current = null
+    }
+
     if (clientRef.current) {
       console.log('🔌 Desconectando de MQTT...')
       clientRef.current.end()
       clientRef.current = null
       setIsConnected(false)
+      resetBackoff()
     }
-  }, [])
+  }, [resetBackoff])
 
   /**
    * Conectar automáticamente al montar
    */
   useEffect(() => {
-    connect()
+    fetchConfig().then(() => {
+      connect()
+    })
 
     return () => {
       disconnect()
     }
-  }, [connect, disconnect])
+  }, []) // Solo al montar
 
   const value = {
     isConnected,
@@ -343,12 +487,16 @@ export function MQTTProvider({ children }) {
     error,
     messageRate,
     totalMessages,
+    config,
+    isLoadingConfig,
+    reconnectState,
     connect,
     disconnect,
     subscribe,
     unsubscribe,
     publish,
-    clearMessages
+    clearMessages,
+    fetchConfig
   }
 
   return (
