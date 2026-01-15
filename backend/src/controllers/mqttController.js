@@ -183,11 +183,11 @@ class MQTTController {
 
   /**
    * POST /api/sensors
-   * Crear nuevo sensor
+   * Crear nuevo sensor (con auto-suscripción a topic)
    */
   async createSensor(req, res) {
     try {
-      const { sensorId, name, type, unit, location, config } = req.body
+      const { sensorId, name, type, unit, location, deviceId, topicBase, variables, config, isActive } = req.body
 
       if (!sensorId || !name || !type) {
         return res.status(400).json({
@@ -203,12 +203,24 @@ class MQTTController {
           type,
           unit,
           location,
-          config: config ? JSON.stringify(config) : '{}'
+          deviceId,
+          topicBase,
+          variables: Array.isArray(variables) ? JSON.stringify(variables) : (variables || '[]'),
+          config: config ? JSON.stringify(config) : '{}',
+          isActive: isActive !== false
         }
       })
 
+      // Auto-suscribirse al topic del sensor si tiene topicBase
+      if (topicBase && mqttService.isConnected()) {
+        const subscribeTopic = `${topicBase}/#`
+        mqttService.subscribe(subscribeTopic)
+        console.log(`✅ Auto-suscrito a topic: ${subscribeTopic}`)
+      }
+
       res.status(201).json({
         success: true,
+        message: 'Sensor creado correctamente',
         data: sensor
       })
     } catch (error) {
