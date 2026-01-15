@@ -140,6 +140,11 @@ const SensorManager = () => {
   }
 
   const handleEdit = (sensor) => {
+    // Parsear variables si es string JSON
+    const parsedVariables = typeof sensor.variables === 'string'
+      ? JSON.parse(sensor.variables || '[]')
+      : (sensor.variables || [])
+
     setEditingSensor(sensor)
     setFormData({
       sensorId: sensor.sensorId,
@@ -149,7 +154,7 @@ const SensorManager = () => {
       location: sensor.location || '',
       deviceId: sensor.deviceId || '',
       topicBase: sensor.topicBase || '',
-      variables: sensor.variables || [],
+      variables: parsedVariables,
       isActive: sensor.isActive
     })
     setShowForm(true)
@@ -561,7 +566,7 @@ const SensorManager = () => {
                   Variables del Sensor
                 </label>
                 <div className="flex flex-wrap gap-2 mb-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl min-h-[52px]">
-                  {formData.variables.map((variable, index) => (
+                  {Array.isArray(formData.variables) && formData.variables.map((variable, index) => (
                     <div
                       key={index}
                       className="flex items-center gap-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg"
