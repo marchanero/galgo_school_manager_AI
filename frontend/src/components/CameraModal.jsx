@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Camera, X, Video, Link, FileText, Plus } from 'lucide-react'
 
 export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadir Cámara' }) {
   const [formData, setFormData] = useState({
@@ -32,30 +33,37 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div 
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 transform transition-all"
+        className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all border border-gray-200 dark:border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <Camera className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl leading-none transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
             aria-label="Cerrar"
           >
-            ×
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
             <label 
               htmlFor="name" 
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
+              <Video className="w-4 h-4 text-blue-500" />
               Nombre de la cámara <span className="text-red-500">*</span>
             </label>
             <input
@@ -66,7 +74,7 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
               onChange={handleChange}
               required
               placeholder="Ej: Cámara Principal"
-              className="input-field"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               autoFocus
             />
           </div>
@@ -74,8 +82,9 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
           <div>
             <label 
               htmlFor="rtspUrl" 
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
+              <Link className="w-4 h-4 text-blue-500" />
               URL RTSP <span className="text-red-500">*</span>
             </label>
             <input
@@ -86,9 +95,10 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
               onChange={handleChange}
               required
               placeholder="rtsp://usuario:contraseña@192.168.1.100:554/stream"
-              className="input-field"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center gap-1">
+              <span className="inline-block w-1 h-1 rounded-full bg-gray-400"></span>
               Formato: rtsp://[usuario]:[contraseña]@[ip]:[puerto]/[ruta]
             </p>
           </div>
@@ -96,8 +106,9 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
           <div>
             <label 
               htmlFor="description" 
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
+              <FileText className="w-4 h-4 text-blue-500" />
               Descripción (opcional)
             </label>
             <textarea
@@ -107,7 +118,7 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
               onChange={handleChange}
               rows="3"
               placeholder="Describe la ubicación o detalles de la cámara..."
-              className="input-field resize-none"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
             />
           </div>
 
@@ -115,14 +126,16 @@ export default function CameraModal({ isOpen, onClose, onSubmit, title = 'Añadi
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 font-medium"
+              className="flex-1 px-6 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
             >
+              <X className="w-4 h-4" />
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 btn-primary"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-medium transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
             >
+              <Plus className="w-4 h-4" />
               Añadir Cámara
             </button>
           </div>

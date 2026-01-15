@@ -1,26 +1,19 @@
 /**
  * EMQX API Service
  * Cliente para interactuar con la API REST de EMQX
+ * Usa el proxy del backend para evitar problemas de CORS
  */
 
 import axios from 'axios'
 
-// Configuración de la API de EMQX
-const EMQX_API_BASE = import.meta.env.VITE_EMQX_API_URL || 'http://100.82.84.24:18083/api/v5'
-const EMQX_API_KEY = import.meta.env.VITE_EMQX_API_KEY || 'admin'
-const EMQX_API_SECRET = import.meta.env.VITE_EMQX_API_SECRET || 'galgo2526'
+// Usar el proxy del backend para evitar CORS
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const EMQX_PROXY_BASE = `${API_BASE}/api/emqx`
 
-// Crear instancia de axios
+// Crear instancia de axios para el proxy
 const emqxClient = axios.create({
-  baseURL: EMQX_API_BASE,
+  baseURL: EMQX_PROXY_BASE,
   timeout: 10000
-})
-
-// Interceptor para agregar autenticación
-emqxClient.interceptors.request.use(config => {
-  const credentials = btoa(`${EMQX_API_KEY}:${EMQX_API_SECRET}`)
-  config.headers.Authorization = `Basic ${credentials}`
-  return config
 })
 
 export const emqxApi = {

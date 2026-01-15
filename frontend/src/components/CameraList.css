@@ -2,48 +2,49 @@
 
 @layer components {
   .camera-list {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-3;
   }
 
   .empty {
-    @apply text-center text-gray-500 dark:text-gray-400 italic p-4;
+    @apply text-center text-gray-500 dark:text-gray-400 italic p-6 rounded-xl bg-gray-50 dark:bg-gray-800/50;
   }
 
   .camera-item {
-    @apply p-0 bg-gray-100 dark:bg-gray-800 border-2 border-transparent rounded-lg;
-    @apply transition-all duration-200 flex items-center gap-2;
+    @apply p-0 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-2xl;
+    @apply transition-all duration-200 flex items-center gap-2 shadow-sm;
+    @apply hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500;
   }
 
   .camera-item:hover {
-    @apply bg-gray-200 dark:bg-gray-700 border-blue-400 dark:border-blue-500;
+    @apply bg-gray-50 dark:bg-gray-700/50;
   }
 
   .camera-item.active {
-    @apply bg-blue-50 dark:bg-blue-900/20 border-blue-500;
+    @apply bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20;
+    @apply border-blue-500 dark:border-blue-400 shadow-lg shadow-blue-500/10;
   }
 
   .camera-content {
-    @apply flex-1 p-3 cursor-pointer;
+    @apply flex-1 p-4 cursor-pointer;
   }
 
   .camera-name {
-    @apply font-semibold text-[0.95rem] mb-1 text-gray-900 dark:text-white;
+    @apply font-semibold text-base mb-1.5 text-gray-900 dark:text-white;
   }
 
   .camera-url {
     @apply text-xs text-gray-500 dark:text-gray-400 break-all mb-2 font-mono;
+    @apply bg-gray-100 dark:bg-gray-700/50 px-2 py-1 rounded-lg inline-block;
   }
 
   .camera-status {
     @apply flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 font-medium;
+    @apply bg-gray-50 dark:bg-gray-700/30 px-2.5 py-1 rounded-full w-fit;
   }
 
   .delete-btn {
-    @apply bg-transparent border-0 p-2.5 cursor-pointer;
-    @apply text-gray-400 hover:text-red-500 transition-colors duration-200 rounded-lg mr-2;
-  }
-
-  .delete-btn:hover {
-    @apply bg-red-50 dark:bg-red-900/20;
+    @apply bg-transparent border-0 p-3 cursor-pointer;
+    @apply text-gray-400 hover:text-red-500 transition-all duration-200 rounded-xl mr-2;
+    @apply hover:bg-red-50 dark:hover:bg-red-900/20;
   }
 }

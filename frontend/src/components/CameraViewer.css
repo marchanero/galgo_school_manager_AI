@@ -1,6 +1,70 @@
 @import 'tailwindcss/components';
 
 @layer components {
+  /* Modern Camera Viewer Styles */
+  .camera-viewer-modern {
+    @apply flex flex-col w-full h-full gap-0 min-h-0 bg-white dark:bg-gray-900 rounded-2xl overflow-hidden shadow-xl;
+  }
+
+  .viewer-header-modern {
+    @apply p-4 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700;
+    @apply flex justify-between items-center gap-4 flex-shrink-0;
+  }
+
+  .control-btn-modern {
+    @apply px-4 py-2 text-white border-0 rounded-xl;
+    @apply cursor-pointer text-sm transition-all duration-200 font-medium;
+    @apply flex items-center gap-2 shadow-sm;
+    @apply focus:ring-2 focus:ring-offset-2 focus:ring-blue-500;
+  }
+
+  .control-btn-modern:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .video-container-modern {
+    @apply flex-1 bg-gradient-to-br from-gray-900 to-gray-950 flex items-center justify-center relative overflow-hidden min-h-0 m-3 rounded-xl;
+  }
+
+  .stream-placeholder {
+    @apply flex flex-col items-center justify-center w-full h-full text-gray-400 p-8;
+  }
+
+  .stream-image {
+    @apply w-full h-full object-contain;
+    animation: fadeInStream 0.3s ease;
+  }
+
+  @keyframes fadeInStream {
+    from { opacity: 0; transform: scale(0.98); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .stream-overlay-modern {
+    @apply absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none;
+  }
+
+  .live-badge-modern {
+    @apply bg-red-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg;
+  }
+
+  .fps-badge {
+    @apply bg-gray-900/80 text-gray-300 px-2 py-1 rounded-lg text-xs font-medium backdrop-blur-sm;
+  }
+
+  .camera-name-badge {
+    @apply bg-gray-900/80 text-white px-3 py-2 rounded-lg text-sm backdrop-blur-sm border border-white/10 font-medium;
+  }
+
+  .viewer-footer-modern {
+    @apply p-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700;
+  }
+
+  .info-card {
+    @apply p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700;
+  }
+
+  /* Legacy styles - keeping for backwards compatibility */
   .camera-viewer {
     @apply flex flex-col w-full h-full gap-0 min-h-0;
   }
@@ -33,7 +97,7 @@
   }
 
   .connection-status {
-    @apply px-3 py-1.5 rounded-full text-xs font-medium capitalize;
+    @apply px-3 py-1.5 rounded-full text-xs font-medium capitalize text-white;
   }
 
   .video-container {

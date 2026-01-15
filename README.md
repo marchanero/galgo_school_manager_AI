@@ -12,6 +12,9 @@ Una aplicación web moderna para visualizar streams de cámaras RTSP usando **Re
 - ✅ Stream de video en tiempo real
 - ✅ Control de reproducción (play/pause)
 - ✅ Información en tiempo real de cámaras
+- ✅ **Gestión de Sensores IoT (MQTT)**
+- ✅ **Escenarios y Aulas configurables**
+- ✅ **Reglas de grabación basadas en eventos**
 - ✅ **Sistema de replicación y backup con rclone/rsync**
 - ✅ **Persistencia de configuración de servidor en base de datos**
 - ✅ **Interfaz de configuración de backup en frontend**
@@ -116,6 +119,32 @@ curl -X POST http://localhost:3000/api/replication/server-config \
     "verifyHash": true
   }'
 ```
+
+## 🌡️ Gestión de Sensores y Escenarios
+
+La aplicación permite integrar sensores IoT vía MQTT y organizar cámaras y sensores en "Escenarios" (aulas, salas, etc.).
+
+### Características de Sensores
+
+- **Integración MQTT Automática:** Los sensores se detectan mediante suscripción a tópicos específicos.
+- **Tipos de Datos:** Soporta temperatura, humedad, CO2, y métricas biométricas (EmotiBit).
+- **Dashboard en Tiempo Real:** Visualización de los últimos datos recibidos en el frontend.
+- **Umbrales:** Configuración de límites (min/max) por tipo de sensor y escenario.
+
+### Escenarios y Reglas
+
+- **Agrupación Lógica:** Asignación de cámaras y sensores a espacios físicos específicos.
+- **Reglas de Grabación:** Automatización de grabaciones basada en condiciones de sensores.
+  - *Ejemplo:* Si la temperatura de la "Aula 1" es > 30°C, iniciar grabación automática.
+- **Historial de Ejecuciones:** Registro detallado de qué reglas se dispararon y qué acciones realizaron.
+
+### Endpoints de Sensores y Escenarios
+
+- `GET /api/sensors` - Listar todos los sensores detectados/configurados
+- `PUT /api/sensors/:id` - Actualizar configuración de sensor
+- `GET /api/scenarios` - Obtener todos los escenarios
+- `POST /api/scenarios` - Crear nuevo escenario
+- `POST /api/scenarios/:id/thresholds` - Configurar umbrales para un escenario
 
 ## 🛠️ Instalación
 
