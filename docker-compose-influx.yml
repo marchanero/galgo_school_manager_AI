@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: camera_rtsp_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=galgo_iot_2026
+      - DOCKER_INFLUXDB_INIT_ORG=galgo
+      - DOCKER_INFLUXDB_INIT_BUCKET=sensors_data
+      - DOCKER_INFLUXDB_INIT_RETENTION=30d
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=galgo_secret_token_iot_2026
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    networks:
+      - default
+      - iot_network
+
+  telegraf:
+    image: telegraf:1.28
+    container_name: camera_rtsp_telegraf
+    restart: unless-stopped
+    volumes:
+      - ./telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    depends_on:
+      - influxdb
+    networks:
+      - default
+      - iot_network
+
+networks:
+  iot_network:
+    external: true
+    name: galgo_school_manager_ai_default
+
+volumes:
+  influxdb_data:
+  influxdb_config:
