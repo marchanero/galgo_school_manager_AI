@@ -1,4 +1,4 @@
-# 🎥 Visor de Cámaras RTSP - MERN Stack
+# 🎥 Galgo - School AI
 
 Una aplicación web moderna para visualizar streams de cámaras RTSP usando **React + Vite** en el frontend y **Node.js + Express** en el backend, con **SQLite** y **Prisma ORM** para la gestión de datos.
 
