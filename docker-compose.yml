@@ -33,18 +33,25 @@ services:
       - backend
 
   mqtt:
-    image: eclipse-mosquitto:2
-    container_name: camera_rtsp_mqtt
+    image: emqx/emqx:5.8
+    container_name: camera_rtsp_emqx
     restart: unless-stopped
+    environment:
+      - EMQX_NODE_NAME=emqx@127.0.0.1
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=galgo2526
+      - EMQX_ALLOW_ANONYMOUS=true
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "1883:1883"     # MQTT TCP
+      - "8083:8083"     # MQTT WebSocket
+      - "18083:18083"   # Dashboard + API REST
     volumes:
-      - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/data:/mosquitto/data
-      - ./mosquitto/log:/mosquitto/log
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
 
 volumes:
   prisma_data:
   recordings_data:
   media_data:
+  emqx_data:
+  emqx_log:
