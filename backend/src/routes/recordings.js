@@ -1,6 +1,7 @@
 import express from 'express'
 import recordingManager from '../services/recordingManager.js'
 import videoProcessor from '../services/videoProcessor.js'
+import syncRecordingService from '../services/syncRecordingService.js'
 
 const router = express.Router()
 
@@ -229,4 +230,113 @@ router.get('/memory-config', (req, res) => {
   }
 })
 
+// ============================================
+// GRABACIÓN SINCRONIZADA (Video + Sensores)
+// ============================================
+
+/**
+ * POST /api/recordings/sync/start
+ * Inicia grabación sincronizada de video y sensores
+ * 
+ * Body:
+ * - camera: { id, name, rtspUrl }
+ * - scenarioId: (opcional)
+ * - scenarioName: (opcional)
+ * - sensorTopics: (opcional) Array de topics específicos a grabar
+ */
+router.post('/sync/start', async (req, res) => {
+  try {
+    const { camera, scenarioId, scenarioName, sensorTopics } = req.body
+
+    if (!camera || !camera.id || !camera.rtspUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere camera con id, name y rtspUrl'
+      })
+    }
+
+    const result = await syncRecordingService.startSyncRecording(camera, {
+      scenarioId,
+      scenarioName,
+      sensorTopics
+    })
+
+    res.json(result)
+  } catch (error) {
+    console.error('Error iniciando grabación sincronizada:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * POST /api/recordings/sync/:cameraId/stop
+ * Detiene grabación sincronizada y genera manifest
+ */
+router.post('/sync/:cameraId/stop', async (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const result = await syncRecordingService.stopSyncRecording(parseInt(cameraId))
+    res.json(result)
+  } catch (error) {
+    console.error('Error deteniendo grabación sincronizada:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * GET /api/recordings/sync/status
+ * Obtiene estado de todas las sesiones sincronizadas activas
+ */
+router.get('/sync/status', (req, res) => {
+  try {
+    const sessions = syncRecordingService.getAllSessionsStatus()
+    res.json({
+      success: true,
+      activeSessions: sessions.length,
+      sessions
+    })
+  } catch (error) {
+    console.error('Error obteniendo estado de sesiones:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * GET /api/recordings/sync/:cameraId/status
+ * Obtiene estado de una sesión específica
+ */
+router.get('/sync/:cameraId/status', (req, res) => {
+  try {
+    const { cameraId } = req.params
+    const session = syncRecordingService.getSessionStatus(parseInt(cameraId))
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'No hay sesión activa para esta cámara'
+      })
+    }
+
+    res.json({ success: true, session })
+  } catch (error) {
+    console.error('Error obteniendo estado de sesión:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
+/**
+ * POST /api/recordings/sync/stop-all
+ * Detiene todas las sesiones sincronizadas
+ */
+router.post('/sync/stop-all', async (req, res) => {
+  try {
+    await syncRecordingService.stopAll()
+    res.json({ success: true, message: 'Todas las sesiones sincronizadas detenidas' })
+  } catch (error) {
+    console.error('Error deteniendo todas las sesiones:', error)
+    res.status(500).json({ success: false, error: error.message })
+  }
+})
+
 export default router
+
