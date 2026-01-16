@@ -1111,64 +1111,55 @@ const DashboardSummary = () => {
             </div>
           </div>
 
-          {/* Sensores Activos */}
+          {/* EMQX Metrics Summary - Premium Design */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Activity className="w-4 h-4 text-green-500" />
-                {activeScenario ? 'Otros Sensores Activos' : 'Sensores Activos'}
+                <Activity className="w-4 h-4 text-cyan-500" />
+                Estado MQTT
               </h3>
-              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mqttConnected
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${mqttConnected
+                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                {mqttConnected ? 'Live' : 'Offline'}
+                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                {mqttConnected ? 'Conectado' : 'Desconectado'}
               </span>
             </div>
 
-            <div className="p-4">
-              {activeSensorsList.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                  <Radio className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Sin sensores activos</p>
+            <div className="p-4 grid grid-cols-3 gap-4">
+              {/* Message Rate */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-md shadow-purple-500/25 mb-2">
+                  <Zap className="w-5 h-5 text-white" />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {activeSensorsList.map((sensor) => (
-                    <div
-                      key={sensor.id}
-                      className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                          <Zap className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {sensor.type}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {sensor.id}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">
-                          {typeof sensor.value === 'object'
-                            ? (sensor.value?.heart_rate || sensor.value?.value || '---')
-                            : sensor.value || '---'
-                          }
-                        </p>
-                        <p className="text-xs text-green-500">
-                          <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                          Hace {Math.round(sensor.lastSeen / 1000)}s
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {messageRate.toFixed(0)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">msg/s</p>
+              </div>
+
+              {/* Total Messages */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/25 mb-2">
+                  <MessageSquare className="w-5 h-5 text-white" />
                 </div>
-              )}
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {totalMessages > 1000 ? `${(totalMessages / 1000).toFixed(1)}k` : totalMessages}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">total</p>
+              </div>
+
+              {/* Sensors Active */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/25 mb-2">
+                  <Radio className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {sensorData.size}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">sensores</p>
+              </div>
             </div>
           </div>
 
