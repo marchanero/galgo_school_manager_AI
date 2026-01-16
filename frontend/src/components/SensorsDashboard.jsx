@@ -453,18 +453,69 @@ function SensorsDashboard() {
         </div>
       )}
 
-      {/* Empty State when no scenario is active */}
+      {/* Fallback: Show live MQTT sensors when no scenario is active */}
       {!activeScenario && (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
-          <div className="w-12 h-12 mx-auto rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
-            <MapPin className="w-6 h-6 text-gray-400" />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Radio className="w-4 h-4 text-emerald-500" />
+              Sensores Detectados
+            </h3>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {activeSensors.length} en tiempo real
+            </span>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            No hay escenario activo
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            Activa un escenario desde el panel principal para ver sus sensores en tiempo real
-          </p>
+
+          <div className="p-4">
+            {activeSensors.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {activeSensors.map((sensor) => {
+                  const data = getSensorValue(sensor)
+                  const SensorIcon = getSensorIcon(sensor.type)
+
+                  return (
+                    <div
+                      key={sensor.id || sensor.sensorId}
+                      className="relative rounded-lg p-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700"
+                    >
+                      {/* Status indicator */}
+                      <div className="absolute top-2 right-2">
+                        <span className={`w-2 h-2 rounded-full block ${data ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                      </div>
+
+                      {/* Icon */}
+                      <div className="w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center mb-2">
+                        <SensorIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                      </div>
+
+                      {/* Sensor name */}
+                      <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate">
+                        {sensor.name || sensor.type}
+                      </h4>
+
+                      {/* Value */}
+                      <div className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
+                        {data?.value?.toFixed?.(1) || data?.value || '--'}
+                        {sensor.unit && <span className="text-xs font-normal text-gray-500 ml-1">{sensor.unit}</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 mx-auto rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
+                  <Radio className="w-6 h-6 text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+                  No hay sensores enviando datos
+                </p>
+                <p className="text-xs text-gray-400">
+                  Activa un escenario o inicia un publisher MQTT
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
