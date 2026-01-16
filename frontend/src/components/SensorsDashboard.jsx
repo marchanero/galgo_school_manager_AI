@@ -317,8 +317,8 @@ function SensorsDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
-            <Activity className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-2xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+            <Activity className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -362,93 +362,71 @@ function SensorsDashboard() {
         </div>
       </div>
 
-      {/* Sensores del Escenario Activo - Premium Design */}
+      {/* Sensores del Escenario Activo */}
       {activeScenario && (
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-200/50 dark:border-indigo-700/50 bg-gradient-to-br from-white via-indigo-50/30 to-purple-50/30 dark:from-gray-800 dark:via-indigo-900/20 dark:to-purple-900/20 shadow-xl">
-          {/* Decorative gradient orbs */}
-          <div className="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br from-indigo-400/20 to-purple-400/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-full blur-2xl" />
-
-          {/* Header with gradient */}
-          <div className="relative px-6 py-5 border-b border-indigo-100 dark:border-indigo-800/50 bg-gradient-to-r from-indigo-500/5 to-purple-500/5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                    <MapPin className="w-6 h-6 text-white" />
-                  </div>
-                  <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white dark:border-gray-800 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                    {activeScenario.name}
-                  </h3>
-                  <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">
-                    {scenarioSensors.filter(s => s.isOnline).length} activos de {scenarioSensors.length} sensores
-                  </p>
-                </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Header */}
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1.5 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-semibold">
-                  Escenario Activo
-                </span>
+              <div>
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {activeScenario.name}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {scenarioSensors.filter(s => s.isOnline).length} activos de {scenarioSensors.length} sensores
+                </p>
               </div>
             </div>
+            <span className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded text-xs font-medium">
+              Escenario Activo
+            </span>
           </div>
 
           {/* Sensors Grid */}
-          <div className="relative p-6">
+          <div className="p-4">
             {scenarioSensors.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {scenarioSensors.map((sensor) => (
                   <div
                     key={sensor.id}
-                    className={`group relative rounded-xl p-4 transition-all duration-300 cursor-default ${sensor.isOnline
-                      ? 'bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-emerald-200 dark:border-emerald-800/50 shadow-md hover:shadow-xl hover:shadow-emerald-500/10 hover:-translate-y-1'
-                      : 'bg-gray-50/80 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 opacity-75 hover:opacity-100'
+                    className={`relative rounded-lg p-3 ${sensor.isOnline
+                      ? 'bg-gray-50 dark:bg-gray-700/50 border border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 opacity-60'
                       }`}
                   >
-                    {/* Status indicator glow */}
-                    {sensor.isOnline && (
-                      <div className="absolute top-2 right-2 w-2.5 h-2.5">
-                        <span className="absolute inset-0 bg-emerald-400 rounded-full animate-ping opacity-75" />
-                        <span className="relative block w-2.5 h-2.5 bg-emerald-500 rounded-full" />
-                      </div>
-                    )}
-                    {!sensor.isOnline && (
-                      <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-gray-400 rounded-full" />
-                    )}
+                    {/* Status indicator */}
+                    <div className="absolute top-2 right-2">
+                      <span className={`w-2 h-2 rounded-full block ${sensor.isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                    </div>
 
-                    {/* Icon with gradient background */}
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${sensor.isOnline
-                      ? 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-md shadow-indigo-500/25'
+                    {/* Icon */}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${sensor.isOnline
+                      ? 'bg-indigo-100 dark:bg-indigo-900/30'
                       : 'bg-gray-200 dark:bg-gray-700'
                       }`}>
                       {React.createElement(getSensorIcon(sensor.type), {
-                        className: sensor.isOnline ? 'w-5 h-5 text-white' : 'w-5 h-5 text-gray-400'
+                        className: sensor.isOnline ? 'w-4 h-4 text-indigo-600 dark:text-indigo-400' : 'w-4 h-4 text-gray-400'
                       })}
                     </div>
 
                     {/* Sensor name */}
-                    <h4 className="font-semibold text-gray-900 dark:text-white text-sm mb-1 truncate">
+                    <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate">
                       {sensor.name}
                     </h4>
 
                     {/* Value display */}
-                    <div className={`text-2xl font-bold mb-1 ${sensor.isOnline
+                    <div className={`text-lg font-bold ${sensor.isOnline
                       ? 'text-gray-900 dark:text-white'
-                      : 'text-gray-400 dark:text-gray-500'
+                      : 'text-gray-400'
                       }`}>
                       {sensor.isOnline && sensor.liveData
-                        ? <span className="tabular-nums">{sensor.liveData.value?.toFixed(1) || '--'} <span className="text-sm font-normal text-gray-500">{sensor.unit || ''}</span></span>
-                        : <span className="text-sm font-normal">Esperando...</span>
+                        ? <span className="tabular-nums">{sensor.liveData.value?.toFixed(1) || '--'} <span className="text-xs font-normal text-gray-500">{sensor.unit || ''}</span></span>
+                        : <span className="text-xs font-normal">--</span>
                       }
                     </div>
-
-                    {/* Location */}
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      {sensor.location || sensor.topicBase}
-                    </p>
                   </div>
                 ))}
               </div>
@@ -470,15 +448,15 @@ function SensorsDashboard() {
         </div>
       )}
 
-      {/* Last Message Info - Simplified */}
+      {/* Last Message Info */}
       {lastMessage && (
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400">
+        <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <MessageSquare className="w-4 h-4" />
-            <span className="text-sm font-medium">Último mensaje:</span>
-            <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded">{lastMessage.topic}</span>
+            <span className="text-sm">Último mensaje:</span>
+            <code className="text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">{lastMessage.topic}</code>
           </div>
-          <span className="text-xs text-blue-500 dark:text-blue-300">
+          <span className="text-xs text-gray-500">
             {new Date(lastMessage.timestamp).toLocaleTimeString()}
           </span>
         </div>
@@ -486,9 +464,9 @@ function SensorsDashboard() {
 
       {/* Empty State when no scenario is active */}
       {!activeScenario && (
-        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center mb-4">
-            <MapPin className="w-8 h-8 text-indigo-400" />
+        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-dashed border-gray-300 dark:border-gray-600">
+          <div className="w-12 h-12 mx-auto rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-3">
+            <MapPin className="w-6 h-6 text-gray-400" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
             No hay escenario activo
