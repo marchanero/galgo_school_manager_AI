@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useMQTT } from '../contexts/MQTTContext'
+import { useScenario } from '../contexts/ScenarioContext'
 import { useEmqxData } from '../hooks/useEmqxData'
-import api from '../services/api'
-import { 
-  Activity, 
-  Radio, 
-  RefreshCw, 
-  Wifi, 
-  WifiOff, 
-  Users, 
-  MessageSquare, 
-  ArrowDown, 
+import {
+  Activity,
+  Radio,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Users,
+  MessageSquare,
+  ArrowDown,
   ArrowUp,
   Clock,
   MapPin,
@@ -30,18 +30,37 @@ import {
 
 function SensorsDashboard() {
   const { isConnected, sensorData, lastMessage } = useMQTT()
-  const { 
-    clusterStats, 
-    sensorClients, 
-    messageMetrics, 
+  const {
+    clusterStats,
+    sensorClients,
+    messageMetrics,
     loading: emqxLoading,
-    refetch: refetchEmqx 
+    refetch: refetchEmqx
   } = useEmqxData(true, 5000) // Auto-refresh cada 5s
-  
+
   const [sensors, setSensors] = useState([])
   const [activeSensors, setActiveSensors] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // Obtener escenario activo y sus sensores
+  const { activeScenario, getActiveSensors } = useScenario()
+
+  // Sensores del escenario activo con sus datos en tiempo real
+  const scenarioSensors = useMemo(() => {
+    if (!activeScenario) return []
+    const scenarioSensorIds = getActiveSensors()
+    return sensors
+      .filter(s => scenarioSensorIds.includes(s.sensorId) || scenarioSensorIds.includes(s.id))
+      .map(s => {
+        const mqttData = sensorData.get(s.sensorId) || sensorData.get(s.topicBase)
+        return {
+          ...s,
+          isOnline: !!mqttData,
+          liveData: mqttData || null
+        }
+      })
+  }, [activeScenario, sensors, sensorData, getActiveSensors])
 
   useEffect(() => {
     fetchSensors()
@@ -65,20 +84,20 @@ function SensorsDashboard() {
         const mqttData = Array.from(sensorData.values()).find(
           data => data.type === sensor.type || sensorData.has(sensor.sensorId)
         )
-        
-        const hasPublisher = sensorClients.some(client => 
-          client.clientid.includes(sensor.sensorId) || 
+
+        const hasPublisher = sensorClients.some(client =>
+          client.clientid.includes(sensor.sensorId) ||
           client.clientid.includes('sensor-publisher') ||
           client.clientid.includes('stress-test')
         )
-        
+
         return {
           ...sensor,
           hasData: !!mqttData,
           hasPublisher
         }
       }).filter(s => s.hasData || s.hasPublisher)
-      
+
       setActiveSensors([...combinedSensors, ...sensorsFromMQTT.filter(
         mqtt => !combinedSensors.some(s => s.sensorId === mqtt.sensorId)
       )])
@@ -109,17 +128,17 @@ function SensorsDashboard() {
     if (sensorData.has(sensor.sensorId)) {
       return sensorData.get(sensor.sensorId)
     }
-    
+
     // Si tiene data directa (del MQTT), usarla
     if (sensor.data) {
       return sensor.data
     }
-    
+
     // Buscar por tipo de sensor
     const dataByType = Array.from(sensorData.values()).find(
       data => data.type === sensor.type
     )
-    
+
     return dataByType || null
   }
 
@@ -143,18 +162,18 @@ function SensorsDashboard() {
 
   const formatValue = (sensor, sensorData) => {
     if (!sensorData) return 'Sin datos'
-    
+
     // Obtener el valor del sensor
     const data = sensorData.value || sensorData.data || {}
-    
+
     if (sensor.type === 'emotibit') {
       const value = data.data || data.value || data
-      
+
       // Calcular magnitud del acelerómetro si existen los valores
       const accelMagnitude = (value.accel_x !== undefined && value.accel_y !== undefined && value.accel_z !== undefined)
-        ? Math.sqrt(value.accel_x**2 + value.accel_y**2 + value.accel_z**2).toFixed(3)
+        ? Math.sqrt(value.accel_x ** 2 + value.accel_y ** 2 + value.accel_z ** 2).toFixed(3)
         : null
-      
+
       return (
         <div className="space-y-2">
           {/* Heart Rate - Principal */}
@@ -164,7 +183,7 @@ function SensorsDashboard() {
             </span>
             <span className="text-sm text-gray-500 dark:text-gray-400">bpm</span>
           </div>
-          
+
           {/* Temperaturas */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             {value.temperature && (
@@ -180,7 +199,7 @@ function SensorsDashboard() {
               </div>
             )}
           </div>
-          
+
           {/* EDA y HRV */}
           <div className="grid grid-cols-2 gap-2 text-xs">
             {value.eda && (
@@ -196,7 +215,7 @@ function SensorsDashboard() {
               </div>
             )}
           </div>
-          
+
           {/* Acelerómetro */}
           {accelMagnitude && (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-2">
@@ -211,7 +230,7 @@ function SensorsDashboard() {
               </div>
             </div>
           )}
-          
+
           {/* PPG (opcional, para debugging) */}
           {value.ppg !== undefined && (
             <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
@@ -222,7 +241,7 @@ function SensorsDashboard() {
         </div>
       )
     }
-    
+
     // Para otros tipos de sensores
     const value = data.value || data
     return `${value || 'N/A'} ${sensor.unit || ''}`
@@ -230,13 +249,13 @@ function SensorsDashboard() {
 
   const getStatusColor = (sensor, sensorData) => {
     if (!sensorData) return 'bg-gray-500'
-    
+
     const timestamp = sensorData.timestamp
     if (!timestamp) return 'bg-gray-500'
-    
+
     const age = Date.now() - new Date(timestamp).getTime()
     if (age > 60000) return 'bg-yellow-500' // Más de 1 minuto
-    
+
     return 'bg-green-500'
   }
 
@@ -270,11 +289,10 @@ function SensorsDashboard() {
         </div>
         <div className="flex items-center gap-3">
           {/* Connection Status */}
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${
-            isConnected 
-              ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' 
-              : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
-          }`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${isConnected
+            ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+            : 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+            }`}>
             {isConnected ? (
               <>
                 <Wifi className="w-4 h-4" />
@@ -288,7 +306,7 @@ function SensorsDashboard() {
               </>
             )}
           </div>
-          <button 
+          <button
             onClick={() => {
               fetchSensors()
               refetchEmqx()
@@ -301,6 +319,66 @@ function SensorsDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Sensores del Escenario Activo */}
+      {activeScenario && (
+        <div className="bg-gradient-to-r from-indigo-500/10 to-purple-500/10 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-2xl p-6 border border-indigo-200 dark:border-indigo-800">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center">
+              <MapPin className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Escenario: {activeScenario.name}
+              </h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {scenarioSensors.length} sensores asignados
+              </p>
+            </div>
+          </div>
+
+          {scenarioSensors.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {scenarioSensors.map((sensor) => (
+                <div
+                  key={sensor.id}
+                  className={`rounded-xl p-4 border transition-all ${sensor.isOnline
+                    ? 'bg-white dark:bg-gray-800 border-emerald-300 dark:border-emerald-700 shadow-md'
+                    : 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700'
+                    }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {React.createElement(getSensorIcon(sensor.type), { className: 'w-4 h-4 text-indigo-500' })}
+                      <span className="font-medium text-gray-900 dark:text-white text-sm truncate">
+                        {sensor.name}
+                      </span>
+                    </div>
+                    {sensor.isOnline ? (
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                    ) : (
+                      <span className="w-2 h-2 bg-gray-400 rounded-full" />
+                    )}
+                  </div>
+                  <div className="text-xl font-bold text-gray-900 dark:text-white">
+                    {sensor.isOnline && sensor.liveData
+                      ? `${sensor.liveData.value?.toFixed(1) || '--'} ${sensor.unit || ''}`
+                      : <span className="text-gray-400 text-sm font-normal">Esperando datos...</span>
+                    }
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                    {sensor.location || sensor.topicBase}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+              No hay sensores asignados a este escenario
+            </div>
+          )}
+        </div>
+      )}
 
       {/* EMQX Stats Cards */}
       {clusterStats && (
@@ -316,7 +394,7 @@ function SensorsDashboard() {
               {clusterStats['connections.count'] || 0}
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
@@ -328,7 +406,7 @@ function SensorsDashboard() {
               {sensorClients.length}
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
@@ -340,7 +418,7 @@ function SensorsDashboard() {
               {activeSensors.length}
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
@@ -352,7 +430,7 @@ function SensorsDashboard() {
               {messageMetrics?.received || 0}
             </div>
           </div>
-          
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-5 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
@@ -396,13 +474,13 @@ function SensorsDashboard() {
             const data = getSensorValue(sensor)
             const statusColor = getStatusColor(sensor, data)
             const SensorIcon = getSensorIcon(sensor.type)
-            
+
             // Verificar si hay un cliente publisher activo para este sensor
-            const isPublisherActive = sensorClients.some(client => 
-              client.clientid.includes(sensor.sensorId) || 
+            const isPublisherActive = sensorClients.some(client =>
+              client.clientid.includes(sensor.sensorId) ||
               client.clientid.includes('sensor-publisher')
             )
-            
+
             return (
               <div
                 key={sensor.id || sensor.sensorId}
@@ -410,7 +488,7 @@ function SensorsDashboard() {
               >
                 {/* Status Bar */}
                 <div className={`h-1 ${data ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
-                
+
                 <div className="p-5">
                   {/* Header */}
                   <div className="flex justify-between items-start mb-4">
@@ -472,11 +550,10 @@ function SensorsDashboard() {
 
                   {/* Status Badge */}
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-                      data 
-                        ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${data
+                      ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
+                      }`}>
                       {data ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
                       {data ? 'Activo' : 'Inactivo'}
                     </span>
@@ -515,7 +592,7 @@ function SensorsDashboard() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sensorClients.map((client, idx) => (
-              <div 
+              <div
                 key={idx}
                 className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600"
               >
