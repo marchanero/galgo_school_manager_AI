@@ -497,6 +497,10 @@ const DashboardSummary = () => {
     return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
   }
 
+  // Obtener IDs de sensores del escenario activo para exclusión
+  const { getActiveSensors } = useScenario()
+  const scenarioSensorIds = activeScenario ? getActiveSensors() : []
+
   // Obtener sensores activos para mostrar (únicos y filtrados)
   const activeSensorsList = React.useMemo(() => {
     const uniqueSensors = new Map()
@@ -505,7 +509,12 @@ const DashboardSummary = () => {
     Array.from(sensorData.entries()).forEach(([sensorId, data]) => {
       // Verificar que el sensor esté activo (última actualización < 10 segundos)
       const isRecent = Date.now() - new Date(data.timestamp).getTime() < 10000
-      if (isRecent) {
+
+      // Excluir si ya está en el escenario activo
+      const isInScenario = scenarioSensorIds.includes(sensorId) ||
+        scenarioSensorIds.includes(String(sensorId))
+
+      if (isRecent && !isInScenario) {
         uniqueSensors.set(sensorId, {
           id: sensorId,
           type: data.type || sensorId,
@@ -520,7 +529,7 @@ const DashboardSummary = () => {
     return Array.from(uniqueSensors.values())
       .sort((a, b) => a.type.localeCompare(b.type))
       .slice(0, 5) // Mostrar máximo 5 sensores
-  }, [sensorData])
+  }, [sensorData, scenarioSensorIds])
 
   return (
     <div className="space-y-4">
@@ -563,16 +572,16 @@ const DashboardSummary = () => {
 
           {/* Timer de grabación */}
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${recordingState === 'recording'
-              ? 'bg-red-50 dark:bg-red-900/20'
-              : 'bg-gray-50 dark:bg-gray-700/50'
+            ? 'bg-red-50 dark:bg-red-900/20'
+            : 'bg-gray-50 dark:bg-gray-700/50'
             }`}>
             <Clock className={`w-4 h-4 ${recordingState === 'recording'
-                ? 'text-red-500'
-                : 'text-gray-400'
+              ? 'text-red-500'
+              : 'text-gray-400'
               }`} />
             <span className={`font-mono text-sm font-medium ${recordingState === 'recording'
-                ? 'text-red-600 dark:text-red-400'
-                : 'text-gray-500 dark:text-gray-400'
+              ? 'text-red-600 dark:text-red-400'
+              : 'text-gray-500 dark:text-gray-400'
               }`}>
               {formatTime(elapsedTime)}
             </span>
@@ -588,8 +597,8 @@ const DashboardSummary = () => {
           <div className="flex items-center gap-2">
             {/* MQTT Status */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${mqttConnected
-                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+              ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
               }`}>
               {mqttConnected ? (
                 <Wifi className="w-3.5 h-3.5" />
@@ -601,10 +610,10 @@ const DashboardSummary = () => {
 
             {/* Sync Status */}
             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium ${syncStatus.isSyncing
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-                : syncStatus.isConnected
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                  : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+              : syncStatus.isConnected
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
               }`}>
               <RefreshCw className={`w-3.5 h-3.5 ${syncStatus.isSyncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
@@ -625,8 +634,8 @@ const DashboardSummary = () => {
 
           {/* Control de Grabación Principal */}
           <div className={`rounded-xl shadow-sm border overflow-hidden transition-all ${recordingState === 'recording'
-              ? 'bg-gradient-to-r from-red-500 to-red-600 border-red-400'
-              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+            ? 'bg-gradient-to-r from-red-500 to-red-600 border-red-400'
+            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
             }`}>
             <div className="p-4">
               <div className="flex items-center justify-between">
@@ -635,8 +644,8 @@ const DashboardSummary = () => {
                     onClick={recordingState === 'recording' ? handleStopRecordingClick : handleStartRecording}
                     disabled={cameras.length === 0}
                     className={`flex items-center justify-center w-14 h-14 rounded-full transition-all transform hover:scale-105 active:scale-95 ${recordingState === 'recording'
-                        ? 'bg-white/20 hover:bg-white/30 text-white'
-                        : 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
+                      ? 'bg-white/20 hover:bg-white/30 text-white'
+                      : 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {recordingState === 'recording' ? (
@@ -691,8 +700,8 @@ const DashboardSummary = () => {
                       localStorage.setItem('dashboardViewMode', 'thumbnail')
                     }}
                     className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${viewMode === 'thumbnail'
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                       }`}
                     title="Vista de snapshots (menos recursos)"
                   >
@@ -705,8 +714,8 @@ const DashboardSummary = () => {
                       localStorage.setItem('dashboardViewMode', 'live')
                     }}
                     className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${viewMode === 'live'
-                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                       }`}
                     title="Streaming en vivo (más fluido)"
                   >
@@ -785,8 +794,8 @@ const DashboardSummary = () => {
                 <button
                   onClick={() => setRecordingTab('video')}
                   className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${recordingTab === 'video'
-                      ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                 >
                   <FileVideo className="w-4 h-4 inline mr-1.5" />
@@ -795,8 +804,8 @@ const DashboardSummary = () => {
                 <button
                   onClick={() => setRecordingTab('sensors')}
                   className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${recordingTab === 'sensors'
-                      ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                 >
                   <Database className="w-4 h-4 inline mr-1.5" />
@@ -948,18 +957,18 @@ const DashboardSummary = () => {
 
             {/* Disco Local */}
             <div className={`rounded-xl p-4 border transition-all duration-300 ${localDiskInfo?.usePercent > 90
-                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                : localDiskInfo?.usePercent > 75
-                  ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+              : localDiskInfo?.usePercent > 75
+                ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
               }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className={`text-xs font-medium uppercase tracking-wide ${localDiskInfo?.usePercent > 90
-                      ? 'text-red-600 dark:text-red-400'
-                      : localDiskInfo?.usePercent > 75
-                        ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-gray-500 dark:text-gray-400'
+                    ? 'text-red-600 dark:text-red-400'
+                    : localDiskInfo?.usePercent > 75
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-gray-500 dark:text-gray-400'
                     }`}>
                     Disco Local
                   </p>
@@ -971,7 +980,7 @@ const DashboardSummary = () => {
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
                         <div
                           className={`h-1.5 rounded-full transition-all duration-300 ${localDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                              localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                            localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
                             }`}
                           style={{ width: `${localDiskInfo.usePercent}%` }}
                         ></div>
@@ -987,16 +996,16 @@ const DashboardSummary = () => {
                   )}
                 </div>
                 <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${localDiskInfo?.usePercent > 90
-                    ? 'bg-red-100 dark:bg-red-900/30'
-                    : localDiskInfo?.usePercent > 75
-                      ? 'bg-yellow-100 dark:bg-yellow-900/30'
-                      : 'bg-orange-100 dark:bg-orange-900/30'
+                  ? 'bg-red-100 dark:bg-red-900/30'
+                  : localDiskInfo?.usePercent > 75
+                    ? 'bg-yellow-100 dark:bg-yellow-900/30'
+                    : 'bg-orange-100 dark:bg-orange-900/30'
                   }`}>
                   <HardDrive className={`w-5 h-5 transition-all duration-300 ${localDiskInfo?.usePercent > 90
-                      ? 'text-red-600 dark:text-red-400'
-                      : localDiskInfo?.usePercent > 75
-                        ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-orange-600 dark:text-orange-400'
+                    ? 'text-red-600 dark:text-red-400'
+                    : localDiskInfo?.usePercent > 75
+                      ? 'text-yellow-600 dark:text-yellow-400'
+                      : 'text-orange-600 dark:text-orange-400'
                     }`} />
                 </div>
               </div>
@@ -1004,18 +1013,18 @@ const DashboardSummary = () => {
 
             {/* Disco Remoto */}
             <div className={`rounded-xl p-4 border transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
-                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                : remoteDiskInfo?.usePercent > 75
-                  ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
-                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+              ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+              : remoteDiskInfo?.usePercent > 75
+                ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800'
+                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
               }`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <p className={`text-xs font-medium uppercase tracking-wide ${remoteDiskInfo?.usePercent > 90
-                      ? 'text-red-600 dark:text-red-400'
-                      : remoteDiskInfo?.usePercent > 75
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-gray-500 dark:text-gray-400'
+                    ? 'text-red-600 dark:text-red-400'
+                    : remoteDiskInfo?.usePercent > 75
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-gray-500 dark:text-gray-400'
                     }`}>
                     Disco Remoto
                   </p>
@@ -1027,7 +1036,7 @@ const DashboardSummary = () => {
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
                         <div
                           className={`h-1.5 rounded-full transition-all duration-300 ${remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                              remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                            remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
                             }`}
                           style={{ width: `${remoteDiskInfo.usePercent}%` }}
                         ></div>
@@ -1048,16 +1057,16 @@ const DashboardSummary = () => {
                   )}
                 </div>
                 <div className={`p-2 rounded-lg ml-2 transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
-                    ? 'bg-red-100 dark:bg-red-900/30'
-                    : remoteDiskInfo?.usePercent > 75
-                      ? 'bg-amber-100 dark:bg-amber-900/30'
-                      : 'bg-indigo-100 dark:bg-indigo-900/30'
+                  ? 'bg-red-100 dark:bg-red-900/30'
+                  : remoteDiskInfo?.usePercent > 75
+                    ? 'bg-amber-100 dark:bg-amber-900/30'
+                    : 'bg-indigo-100 dark:bg-indigo-900/30'
                   }`}>
                   <HardDrive className={`w-5 h-5 transition-all duration-300 ${remoteDiskInfo?.usePercent > 90
-                      ? 'text-red-600 dark:text-red-400'
-                      : remoteDiskInfo?.usePercent > 75
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-indigo-600 dark:text-indigo-400'
+                    ? 'text-red-600 dark:text-red-400'
+                    : remoteDiskInfo?.usePercent > 75
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-indigo-600 dark:text-indigo-400'
                     }`} />
                 </div>
               </div>
@@ -1102,69 +1111,60 @@ const DashboardSummary = () => {
             </div>
           </div>
 
-          {/* Sensores Activos */}
+          {/* EMQX Metrics Summary */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Activity className="w-4 h-4 text-green-500" />
-                Sensores Activos
+                <Activity className="w-4 h-4 text-cyan-500" />
+                Estado MQTT
               </h3>
               <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mqttConnected
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></span>
-                {mqttConnected ? 'Live' : 'Offline'}
+                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                {mqttConnected ? 'Conectado' : 'Desconectado'}
               </span>
             </div>
 
-            <div className="p-4">
-              {activeSensorsList.length === 0 ? (
-                <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-                  <Radio className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Sin sensores activos</p>
+            <div className="p-4 grid grid-cols-3 gap-4">
+              {/* Message Rate */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2">
+                  <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {activeSensorsList.map((sensor) => (
-                    <div
-                      key={sensor.id}
-                      className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                          <Zap className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {sensor.type}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {sensor.id}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900 dark:text-white">
-                          {typeof sensor.value === 'object'
-                            ? (sensor.value?.heart_rate || sensor.value?.value || '---')
-                            : sensor.value || '---'
-                          }
-                        </p>
-                        <p className="text-xs text-green-500">
-                          <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                          Hace {Math.round(sensor.lastSeen / 1000)}s
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {messageRate.toFixed(0)}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">msg/s</p>
+              </div>
+
+              {/* Total Messages */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center mb-2">
+                  <MessageSquare className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
-              )}
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {totalMessages > 1000 ? `${(totalMessages / 1000).toFixed(1)}k` : totalMessages}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">total</p>
+              </div>
+
+              {/* Sensors Active */}
+              <div className="text-center">
+                <div className="w-10 h-10 mx-auto rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-2">
+                  <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
+                  {sensorData.size}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">sensores</p>
+              </div>
             </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Acciones Rápidas

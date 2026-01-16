@@ -177,14 +177,21 @@ export function MQTTProvider({ children }) {
         setError(null)
         resetBackoff()
 
-        // Auto-suscribirse a tópicos
-        const topics = [
+        // Auto-suscribirse a tópicos base
+        const baseTopics = [
           'camera_rtsp/sensors/#',
           'camera_rtsp/cameras/+/recording/status',
-          'camera_rtsp/rules/#'
+          'camera_rtsp/rules/#',
+          // Tópicos de sensores registrados
+          'aula1/emotibit/#',
+          'aula2/emotibit/#',
+          'biblioteca/co2/#',
+          'invernadero/humidity/#',
+          'lab/sensors/#',
+          'aulaMagna/temperature/#'
         ]
 
-        topics.forEach(topic => {
+        baseTopics.forEach(topic => {
           client.subscribe(topic, { qos: 1 }, (error) => {
             if (error) {
               console.error(`❌ Error suscribiendo a ${topic}:`, error)
@@ -345,7 +352,12 @@ export function MQTTProvider({ children }) {
       })
 
       // Procesar según tipo de tópico
-      if (topic.startsWith('camera_rtsp/sensors/')) {
+      if (topic.startsWith('camera_rtsp/sensors/') ||
+        topic.startsWith('aula') ||
+        topic.startsWith('biblioteca/') ||
+        topic.startsWith('invernadero/') ||
+        topic.startsWith('lab/sensors/') ||
+        topic.startsWith('aulaMagna/')) {
         console.log('🔍 Procesando mensaje de sensor:', topic)
         processSensorMessage(topic, data)
       } else if (topic.includes('/recording/status')) {
@@ -377,15 +389,26 @@ export function MQTTProvider({ children }) {
     console.log('🔧 processSensorMessage called:', topic, data)
     const parts = topic.split('/')
 
-    // El último elemento es siempre el sensor_id
-    const sensorId = parts[parts.length - 1]
-    // Todo lo que está entre 'sensors/' y el sensor_id es el tipo
-    const sensorType = parts.slice(2, -1).join('/')
+    // Determinar el tipo de sensor y el ID según el formato del tópico
+    let sensorId, sensorType
+
+    if (topic.startsWith('camera_rtsp/sensors/')) {
+      // Formato original: camera_rtsp/sensors/TYPE/ID
+      sensorId = parts[parts.length - 1]
+      sensorType = parts.slice(2, -1).join('/')
+    } else {
+      // Formato personalizado: location/category/deviceId/variable
+      // Ej: aula1/emotibit/EM_AABBCCDD01/hr
+      // Construir topicBase (sin el último segmento de variable)
+      const topicBase = parts.slice(0, -1).join('/')
+      sensorId = topicBase  // Usar topicBase como identificador único
+      sensorType = data.type || parts[parts.length - 1]  // Usar type del payload o variable
+    }
 
     console.log('🔍 Parsed sensor:', { sensorType, sensorId, parts })
 
-    if (!sensorType || !sensorId) {
-      console.warn('⚠️ Sensor inválido - faltan type o id:', { sensorType, sensorId })
+    if (!sensorId) {
+      console.warn('⚠️ Sensor inválido - falta id:', { sensorType, sensorId })
       return
     }
 
@@ -393,9 +416,10 @@ export function MQTTProvider({ children }) {
       const newMap = new Map(prev)
       newMap.set(sensorId, {
         type: sensorType,
-        value: data,
+        value: typeof data.value !== 'undefined' ? data.value : data,
         timestamp: data.timestamp || new Date().toISOString(),
-        topic
+        topic,
+        location: data.location || parts[0]
       })
       console.log('✅ Sensor agregado al Map:', sensorId, newMap.size, 'sensores totales')
       return newMap
