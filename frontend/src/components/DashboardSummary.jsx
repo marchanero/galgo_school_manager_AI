@@ -1111,18 +1111,18 @@ const DashboardSummary = () => {
             </div>
           </div>
 
-          {/* EMQX Metrics Summary - Premium Design */}
+          {/* EMQX Metrics Summary */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gradient-to-r from-cyan-500/5 to-blue-500/5">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <Activity className="w-4 h-4 text-cyan-500" />
                 Estado MQTT
               </h3>
-              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${mqttConnected
-                  ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+              <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${mqttConnected
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                 }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
+                <span className={`w-1.5 h-1.5 rounded-full ${mqttConnected ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
                 {mqttConnected ? 'Conectado' : 'Desconectado'}
               </span>
             </div>
@@ -1130,8 +1130,8 @@ const DashboardSummary = () => {
             <div className="p-4 grid grid-cols-3 gap-4">
               {/* Message Rate */}
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-md shadow-purple-500/25 mb-2">
-                  <Zap className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 mx-auto rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-2">
+                  <Zap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                   {messageRate.toFixed(0)}
@@ -1141,8 +1141,8 @@ const DashboardSummary = () => {
 
               {/* Total Messages */}
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md shadow-cyan-500/25 mb-2">
-                  <MessageSquare className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 mx-auto rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center mb-2">
+                  <MessageSquare className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                   {totalMessages > 1000 ? `${(totalMessages / 1000).toFixed(1)}k` : totalMessages}
@@ -1152,8 +1152,8 @@ const DashboardSummary = () => {
 
               {/* Sensors Active */}
               <div className="text-center">
-                <div className="w-10 h-10 mx-auto rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/25 mb-2">
-                  <Radio className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 mx-auto rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-2">
+                  <Radio className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
                   {sensorData.size}
@@ -1164,7 +1164,7 @@ const DashboardSummary = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
               <Settings className="w-4 h-4" />
               Acciones Rápidas
