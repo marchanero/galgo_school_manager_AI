@@ -50,10 +50,37 @@ function SensorsDashboard() {
   const scenarioSensors = useMemo(() => {
     if (!activeScenario) return []
     const scenarioSensorIds = getActiveSensors()
+
+    // Helper: buscar datos MQTT para un sensor
+    const findMqttData = (sensor) => {
+      // 1. Buscar por sensorId exacto
+      if (sensorData.has(sensor.sensorId)) {
+        return sensorData.get(sensor.sensorId)
+      }
+
+      // 2. Buscar por coincidencia de tipo de sensor
+      for (const [key, data] of sensorData.entries()) {
+        if (data.type === sensor.type) {
+          return data
+        }
+      }
+
+      // 3. Buscar por coincidencia parcial del tópico
+      if (sensor.topicBase) {
+        for (const [key, data] of sensorData.entries()) {
+          if (data.topic && data.topic.startsWith(sensor.topicBase)) {
+            return data
+          }
+        }
+      }
+
+      return null
+    }
+
     return sensors
-      .filter(s => scenarioSensorIds.includes(s.sensorId) || scenarioSensorIds.includes(s.id))
+      .filter(s => scenarioSensorIds.includes(s.sensorId) || scenarioSensorIds.includes(s.id) || scenarioSensorIds.includes(String(s.id)))
       .map(s => {
-        const mqttData = sensorData.get(s.sensorId) || sensorData.get(s.topicBase)
+        const mqttData = findMqttData(s)
         return {
           ...s,
           isOnline: !!mqttData,
