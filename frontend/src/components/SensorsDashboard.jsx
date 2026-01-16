@@ -314,21 +314,12 @@ function SensorsDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
-            <Activity className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Sensores en Tiempo Real
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Monitoreo de sensores conectados via MQTT
-            </p>
-          </div>
-        </div>
+      {/* Header - Similar to section headers */}
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+          <Activity className="w-4 h-4 text-cyan-500" />
+          Sensores en Tiempo Real
+        </h2>
         <div className="flex items-center gap-3">
           {/* Connection Status */}
           <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${isConnected
