@@ -132,7 +132,22 @@ function SensorsDashboard() {
       // Si no hay sensores en BD, mostrar solo los de MQTT
       setActiveSensors(sensorsFromMQTT)
     }
+    setLoading(false)
   }, [sensors, sensorData, sensorClients])
+
+  // Filtrar sensores que NO están en el escenario activo para el listado general
+  const generalSensors = useMemo(() => {
+    if (!activeScenario) return activeSensors
+
+    // IDs de los sensores que ya están en el escenario
+    const scenarioSensorIds = scenarioSensors.map(s => s.sensorId || s.id)
+
+    return activeSensors.filter(s =>
+      !scenarioSensorIds.includes(s.sensorId) &&
+      !scenarioSensorIds.includes(s.id) &&
+      !scenarioSensorIds.includes(String(s.id))
+    )
+  }, [activeSensors, scenarioSensors, activeScenario])
 
   const fetchSensors = async () => {
     try {
@@ -480,24 +495,35 @@ function SensorsDashboard() {
       )}
 
       {/* Sensors Grid */}
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+          {activeScenario ? 'Otros Sensores Activos' : 'Sensores Activos'}
+        </h2>
+        <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs font-medium text-gray-500">
+          {generalSensors.length} sensores
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {activeSensors.length === 0 ? (
+        {generalSensors.length === 0 ? (
           <div className="col-span-full text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-4">
               <Radio className="w-8 h-8 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No hay sensores activos
+              No hay otros sensores activos
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Inicia un publisher para ver sensores en tiempo real
+              {activeScenario
+                ? 'Todos los sensores activos ya están mostrados en la sección del escenario'
+                : 'Inicia un publisher para ver sensores en tiempo real'}
             </p>
             <code className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg">
               cd test_publisher && node start.js
             </code>
           </div>
         ) : (
-          activeSensors.map((sensor) => {
+          generalSensors.map((sensor) => {
             const data = getSensorValue(sensor)
             const statusColor = getStatusColor(sensor, data)
             const SensorIcon = getSensorIcon(sensor.type)
