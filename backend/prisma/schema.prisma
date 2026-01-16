@@ -186,12 +186,21 @@ model Recording {
   videoPath     String?  // Ruta al archivo de video MP4
   sensorPath    String?  // Ruta al archivo JSONL de sensores
   
-  // Metadatos
+  // Metadatos originales
   startTime     DateTime @default(now())
   endTime       DateTime?
   duration      Int?     // Duración en segundos
   fileSize      BigInt?  // Tamaño del archivo de video en bytes
   sensorRecords Int      @default(0) // Cantidad de registros de sensores
+
+  // Metadatos de sincronización (NUEVO)
+  sessionId     String?  @unique // UUID de la sesión sincronizada
+  masterTime    DateTime? // Timestamp maestro de sincronización
+  manifestPath  String?   // Ruta al archivo manifest.json
+  
+  // Offsets de sincronización (en ms respecto al masterTime)
+  videoOffset   Int?
+  sensorOffset  Int?
   
   // Información adicional (JSON)
   metadata      String   @default("{}") // { cameraName, scenarioName, sessionId, etc }
@@ -199,4 +208,5 @@ model Recording {
   @@map("recordings")
   @@index([scenarioId, startTime])
   @@index([cameraId, startTime])
+  @@index([sessionId])
 }

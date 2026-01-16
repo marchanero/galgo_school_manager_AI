@@ -2,9 +2,12 @@ import { v4 as uuidv4 } from 'uuid'
 import { EventEmitter } from 'events'
 import path from 'path'
 import fs from 'fs'
+import { PrismaClient } from '@prisma/client'
 import recordingManager from './recordingManager.js'
 import sensorRecorder from './sensorRecorder.js'
 import mqttRecordingService from './mqttRecordingService.js'
+
+const prisma = new PrismaClient()
 
 /**
  * SyncRecordingService - Coordina grabación sincronizada de video y sensores
@@ -14,6 +17,7 @@ import mqttRecordingService from './mqttRecordingService.js'
  * - ID de sesión compartido entre video y sensores
  * - Generación de manifest.json al finalizar
  * - Registro de offsets de sincronización
+ * - Persistencia en base de datos (Prisma)
  */
 class SyncRecordingService extends EventEmitter {
   constructor() {
@@ -52,7 +56,7 @@ class SyncRecordingService extends EventEmitter {
     if (scenarioName) console.log(`   Escenario: ${scenarioName}`)
     console.log(`════════════════════════════════════════\n`)
 
-    // Crear estructura de sesión
+    // Crear estructura de sesión en memoria
     const session = {
       sessionId,
       cameraId: camera.id,
@@ -67,14 +71,38 @@ class SyncRecordingService extends EventEmitter {
       sensorOffsetMs: null,
       status: 'starting',
       videoFiles: [],
-      sensorFile: null
+      sensorFile: null,
+      dbId: null // ID de registro en BD
     }
 
     this.activeSessions.set(camera.id, session)
 
     try {
+      // === PERSISTENCIA INICIAL (BD) ===
+      if (scenarioId) {
+        try {
+          const recordingRecord = await prisma.recording.create({
+            data: {
+              scenarioId: parseInt(scenarioId),
+              cameraId: parseInt(camera.id),
+              sessionId: sessionId,
+              masterTime: masterTimestamp,
+              startTime: masterTimestamp,
+              metadata: JSON.stringify({
+                cameraName: camera.name,
+                scenarioName: scenarioName,
+                sensorTopics: sensorTopics
+              })
+            }
+          })
+          session.dbId = recordingRecord.id
+          console.log(`💾 Registro en BD creado: ID ${session.dbId}`)
+        } catch (dbError) {
+          console.error('⚠️ Error creando registro en BD (continuando sin persistencia):', dbError)
+        }
+      }
+
       // === INICIAR VIDEO (FFmpeg) ===
-      const videoStartMark = Date.now()
       const videoResult = recordingManager.startRecording(camera, {
         scenarioId,
         scenarioName
@@ -89,7 +117,6 @@ class SyncRecordingService extends EventEmitter {
       console.log(`📹 Video iniciado (offset: ${session.videoOffsetMs}ms)`)
 
       // === INICIAR SENSORES (JSONL) ===
-      const sensorStartMark = Date.now()
       const sensorResult = sensorRecorder.startRecording(
         camera.id,
         camera.name,
@@ -116,6 +143,17 @@ class SyncRecordingService extends EventEmitter {
       console.log(`   Offset Video-Sensores: ${totalOffset}ms`)
 
       session.status = 'recording'
+
+      // Actualizar offset en BD si existe el registro
+      if (session.dbId) {
+        await prisma.recording.update({
+          where: { id: session.dbId },
+          data: {
+            videoOffset: session.videoOffsetMs,
+            sensorOffset: session.sensorOffsetMs
+          }
+        }).catch(e => console.error('Error actualizando offsets en DB:', e))
+      }
 
       // Emitir evento
       this.emit('syncRecordingStarted', {
@@ -145,6 +183,11 @@ class SyncRecordingService extends EventEmitter {
     } catch (error) {
       console.error(`❌ Error en grabación sincronizada:`, error)
       
+      // Limpiar BD si se creó registro
+      if (session.dbId) {
+        prisma.recording.delete({ where: { id: session.dbId } }).catch(() => {})
+      }
+
       // Limpiar estado parcial
       this.activeSessions.delete(camera.id)
       
@@ -201,6 +244,26 @@ class SyncRecordingService extends EventEmitter {
 
       // === GENERAR MANIFEST ===
       const manifest = await this.generateManifest(session, endTimestamp, videoResult, sensorResult)
+
+      // === ACTUALIZAR BD ===
+      if (session.dbId) {
+        try {
+          await prisma.recording.update({
+            where: { id: session.dbId },
+            data: {
+              endTime: endTimestamp,
+              duration: manifest.duration,
+              manifestPath: manifest.manifestPath,
+              videoPath: manifestDirToFile(manifest.manifestPath, videoResult?.outputDir), // Helper simplificado
+              sensorPath: sensorResult?.filepath,
+              sensorRecords: sensorResult?.recordCount || 0
+            }
+          })
+          console.log(`💾 Registro en BD actualizado`)
+        } catch (dbError) {
+          console.error('⚠️ Error actualizando BD:', dbError)
+        }
+      }
 
       // Limpiar sesión
       this.activeSessions.delete(cameraId)
@@ -374,6 +437,13 @@ class SyncRecordingService extends EventEmitter {
     console.log('✅ Todas las sesiones detenidas')
   }
 }
+
+// Helper simple para obtener ruta de video válida para BD en caso de múltiples segmentos
+function manifestDirToFile(manifestPath, outputDir) {
+    if (!manifestPath) return null;
+    return path.dirname(manifestPath); // Guardamos el directorio por ahora si hay multiples archivos
+}
+
 
 // Singleton
 const syncRecordingService = new SyncRecordingService()

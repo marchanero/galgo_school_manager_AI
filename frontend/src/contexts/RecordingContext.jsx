@@ -20,7 +20,7 @@ export function RecordingProvider({ children }) {
     }
     return new Map()
   })
-  
+
   const [globalRecordingStatus, setGlobalRecordingStatus] = useState('idle') // 'idle', 'starting', 'recording', 'stopping'
   const [initialSyncDone, setInitialSyncDone] = useState(false)
 
@@ -43,36 +43,32 @@ export function RecordingProvider({ children }) {
     const syncInitialState = async () => {
       try {
         console.log('🔄 Sincronizando estado de grabaciones con backend...')
-        
-        // Obtener estado global del sistema de grabación
-        const response = await fetch('/api/media/status')
+
+        // Obtener estado global del sistema de grabación SINCRONIZADA
+        const response = await fetch('/api/recordings/sync/status')
         const backendStatus = await response.json()
-        
-        console.log('📊 Estado del backend:', backendStatus)
-        
+
+        console.log('📊 Estado del backend (Sync):', backendStatus)
+
         // Crear mapa de detalles de grabación desde el backend
         const recordingDetailsMap = new Map()
-        if (backendStatus.recordingDetails) {
-          for (const detail of backendStatus.recordingDetails) {
-            recordingDetailsMap.set(detail.cameraId, detail)
+        if (backendStatus.sessions) {
+          for (const session of backendStatus.sessions) {
+            recordingDetailsMap.set(session.cameraId, session)
           }
         }
-        
-        // Las grabaciones activas en el backend (ej: ['camera_1', 'camera_2'])
+
+        // Las grabaciones activas en el backend (ej: sesiones activas)
         const activeBackendRecordings = new Set(
-          (backendStatus.recording || []).map(key => {
-            // Extraer el ID de la cámara de 'camera_X'
-            const match = key.match(/camera_(\d+)/)
-            return match ? parseInt(match[1]) : null
-          }).filter(id => id !== null)
+          (backendStatus.sessions || []).map(s => s.cameraId)
         )
-        
+
         console.log('🎬 Grabaciones activas en backend:', Array.from(activeBackendRecordings))
-        
+
         // Actualizar el estado local basándose en el backend
         setRecordings(prev => {
           const updated = new Map()
-          
+
           // Mantener solo las grabaciones que el backend confirma como activas
           for (const [cameraId, recordingInfo] of prev.entries()) {
             if (activeBackendRecordings.has(cameraId)) {
@@ -90,7 +86,7 @@ export function RecordingProvider({ children }) {
               console.log(`🗑️ Grabación ${cameraId} ya no está activa, removiendo del estado`)
             }
           }
-          
+
           // Si hay grabaciones en backend que no tenemos en el estado local, agregarlas
           for (const cameraId of activeBackendRecordings) {
             if (!updated.has(cameraId)) {
@@ -105,19 +101,19 @@ export function RecordingProvider({ children }) {
               })
             }
           }
-          
+
           return updated
         })
-        
+
         setInitialSyncDone(true)
         console.log('✅ Sincronización inicial completada')
-        
+
       } catch (error) {
         console.error('❌ Error sincronizando estado inicial:', error)
         setInitialSyncDone(true) // Marcar como hecho aunque falle, para no bloquear
       }
     }
-    
+
     syncInitialState()
   }, []) // Solo al montar
 
@@ -129,11 +125,11 @@ export function RecordingProvider({ children }) {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
         console.log('👁️ Página visible, re-sincronizando estado...')
-        
+
         try {
           const response = await fetch('/api/media/status')
           const backendStatus = await response.json()
-          
+
           // Crear mapa de detalles de grabación desde el backend
           const recordingDetailsMap = new Map()
           if (backendStatus.recordingDetails) {
@@ -141,19 +137,19 @@ export function RecordingProvider({ children }) {
               recordingDetailsMap.set(detail.cameraId, detail)
             }
           }
-          
+
           const activeBackendRecordings = new Set(
             (backendStatus.recording || []).map(key => {
               const match = key.match(/camera_(\d+)/)
               return match ? parseInt(match[1]) : null
             }).filter(id => id !== null)
           )
-          
+
           console.log('🔄 Grabaciones activas detectadas:', Array.from(activeBackendRecordings))
-          
+
           setRecordings(prev => {
             const updated = new Map()
-            
+
             // Mantener solo las grabaciones activas en backend
             for (const [cameraId, recordingInfo] of prev.entries()) {
               if (activeBackendRecordings.has(cameraId)) {
@@ -167,7 +163,7 @@ export function RecordingProvider({ children }) {
                 })
               }
             }
-            
+
             // Agregar grabaciones del backend que no tenemos
             for (const cameraId of activeBackendRecordings) {
               if (!updated.has(cameraId)) {
@@ -181,18 +177,18 @@ export function RecordingProvider({ children }) {
                 })
               }
             }
-            
+
             return updated
           })
-          
+
         } catch (error) {
           console.error('❌ Error re-sincronizando:', error)
         }
       }
     }
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
+
     // También escuchar pageshow para cuando se restaura desde bfcache
     const handlePageShow = (event) => {
       if (event.persisted) {
@@ -201,7 +197,7 @@ export function RecordingProvider({ children }) {
       }
     }
     window.addEventListener('pageshow', handlePageShow)
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pageshow', handlePageShow)
@@ -216,12 +212,12 @@ export function RecordingProvider({ children }) {
    */
   const syncRecordingStatus = useCallback(async (cameraId, cameraName) => {
     try {
-      const response = await fetch(`/api/media/status/${cameraId}`)
+      const response = await fetch(`/api/recordings/sync/${cameraId}/status`)
       const data = await response.json()
-      
+
       console.log(`🔄 Sync status camera ${cameraId}:`, data)
-      
-      if (data.isRecording) {
+
+      if (data.success && data.session && data.session.status === 'recording') {
         // Solo actualizar si backend confirma grabación activa
         setRecordings(prev => {
           const existing = prev.get(cameraId)
@@ -230,17 +226,17 @@ export function RecordingProvider({ children }) {
             return new Map(prev).set(cameraId, {
               status: 'recording',
               cameraName,
-              startedAt: new Date()
+              startedAt: new Date(data.session.masterTimestamp),
+              elapsedSeconds: data.session.duration || 0,
+              scenarioName: data.session.scenarioName
             })
           }
           // Ya existe, no cambiar
           return prev
         })
+        return true
       }
-      // NO limpiar si isRecording es false - mantener estado local
-      // El usuario debe detener explícitamente con stopRecording
-      
-      return data.isRecording
+      return false
     } catch (error) {
       console.error('Error sincronizando estado:', error)
       return false
@@ -272,17 +268,18 @@ export function RecordingProvider({ children }) {
       }))
 
       const requestBody = {
-        recordSensors: true,
+        camera: { id: cameraId, name: cameraName, rtspUrl: 'auto' }, // El backend resolverá la URL si es necesario o la tomará de la BD
         scenarioId: options.scenarioId,
-        scenarioName: options.scenarioName
+        scenarioName: options.scenarioName,
+        sensorTopics: [] // Opcional: especificar topics
       }
 
-      console.log('📤 Enviando request a backend:', {
-        url: `/api/media/start/${cameraId}`,
+      console.log('📤 Enviando request a backend (Sync):', {
+        url: `/api/recordings/sync/start`,
         body: requestBody
       })
 
-      const response = await fetch(`/api/media/start/${cameraId}`, {
+      const response = await fetch(`/api/recordings/sync/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -331,7 +328,7 @@ export function RecordingProvider({ children }) {
         status: 'stopping'
       }))
 
-      const response = await fetch(`/api/media/stop/${cameraId}`, {
+      const response = await fetch(`/api/recordings/sync/${cameraId}/stop`, {
         method: 'POST'
       })
 
@@ -353,7 +350,7 @@ export function RecordingProvider({ children }) {
 
     } catch (error) {
       console.error('❌ Error deteniendo grabación:', error)
-      
+
       // En caso de error, restaurar estado anterior
       setRecordings(prev => {
         const current = prev.get(cameraId)
@@ -365,7 +362,7 @@ export function RecordingProvider({ children }) {
         }
         return prev
       })
-      
+
       return { success: false, error: error.message }
     }
   }, [recordings])
@@ -377,7 +374,7 @@ export function RecordingProvider({ children }) {
    */
   const startAllRecordings = useCallback(async (cameras, options = {}) => {
     setGlobalRecordingStatus('starting')
-    
+
     const results = await Promise.allSettled(
       cameras.map(camera => startRecording(camera.id, camera.name, options))
     )
@@ -391,7 +388,7 @@ export function RecordingProvider({ children }) {
    */
   const stopAllRecordings = useCallback(async () => {
     setGlobalRecordingStatus('stopping')
-    
+
     const cameraIds = Array.from(recordings.keys())
     const results = await Promise.allSettled(
       cameraIds.map(id => stopRecording(id))
@@ -445,7 +442,7 @@ export function RecordingProvider({ children }) {
       const response = await fetch(`/api/media/recording/${cameraId}/${filename}`, {
         method: 'DELETE'
       })
-      
+
       const data = await response.json()
       return { success: data.success, message: data.message }
     } catch (error) {
@@ -496,25 +493,25 @@ export function RecordingProvider({ children }) {
     recordings,
     globalRecordingStatus,
     initialSyncDone,
-    
+
     // Acciones individuales
     startRecording,
     stopRecording,
     syncRecordingStatus,
-    
+
     // Acciones globales
     startAllRecordings,
     stopAllRecordings,
-    
+
     // Consultas
     getRecordingStatus,
     isRecording,
     getRecordings,
-    
+
     // Gestión de archivos
     downloadRecording,
     deleteRecording,
-    
+
     // Estadísticas y tiempo
     activeRecordingsCount: recordings.size,
     isAnyRecording: recordings.size > 0,
