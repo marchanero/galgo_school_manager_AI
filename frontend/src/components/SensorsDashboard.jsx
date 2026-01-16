@@ -539,201 +539,32 @@ function SensorsDashboard() {
         </div>
       )}
 
-      {/* Sensors Grid */}
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-          {activeScenario ? 'Otros Sensores Activos' : 'Sensores Activos'}
-        </h2>
-        <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs font-medium text-gray-500">
-          {generalSensors.length} sensores
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {generalSensors.length === 0 ? (
-          <div className="col-span-full text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-4">
-              <Radio className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-              No hay otros sensores activos
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              {activeScenario
-                ? 'Todos los sensores activos ya están mostrados en la sección del escenario'
-                : 'Inicia un publisher para ver sensores en tiempo real'}
-            </p>
-            <code className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg">
-              cd test_publisher && node start.js
-            </code>
-          </div>
-        ) : (
-          generalSensors.map((sensor) => {
-            const data = getSensorValue(sensor)
-            const statusColor = getStatusColor(sensor, data)
-            const SensorIcon = getSensorIcon(sensor.type)
-
-            // Verificar si hay un cliente publisher activo para este sensor
-            const isPublisherActive = sensorClients.some(client =>
-              client.clientid.includes(sensor.sensorId) ||
-              client.clientid.includes('sensor-publisher')
-            )
-
-            return (
-              <div
-                key={sensor.id || sensor.sensorId}
-                className="group bg-white dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl shadow-md hover:shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700/50 transition-all duration-300 hover:-translate-y-1"
-              >
-                {/* Status Bar with gradient */}
-                <div className={`h-1.5 ${data
-                  ? 'bg-gradient-to-r from-emerald-400 to-emerald-600'
-                  : 'bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600'
-                  }`} />
-
-                <div className="p-5">
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 ${data
-                          ? 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg shadow-cyan-500/30'
-                          : 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600'
-                        }`}>
-                        <SensorIcon className={`w-6 h-6 ${data ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`} />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {sensor.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {sensor.sensorId}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isPublisherActive && (
-                        <div className="relative w-2.5 h-2.5">
-                          <span className="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-75" />
-                          <span className="relative block w-2.5 h-2.5 bg-blue-500 rounded-full" />
-                        </div>
-                      )}
-                      <div className={`w-3 h-3 rounded-full ${statusColor}`} />
-                    </div>
-                  </div>
-
-                  {/* Value - Enhanced */}
-                  <div className="mb-4 p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-700/50 dark:to-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-700/30">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white tabular-nums">
-                      {formatValue(sensor, data)}
-                    </div>
-                  </div>
-
-                  {/* Info */}
-                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                    {sensor.location && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <span>{sensor.location}</span>
-                      </div>
-                    )}
-                    {sensor._count?.events !== undefined && (
-                      <div className="flex items-center gap-2">
-                        <Hash className="w-4 h-4 text-gray-400" />
-                        <span>{sensor._count.events} eventos</span>
-                      </div>
-                    )}
-                    {isPublisherActive && (
-                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
-                        <Zap className="w-4 h-4" />
-                        <span className="font-medium">Publisher activo</span>
-                      </div>
-                    )}
-                    {data && data.timestamp && (
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{new Date(data.timestamp).toLocaleTimeString()}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${data
-                      ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-400'
-                      }`}>
-                      {data ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                      {data ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {/* Last Message Info */}
+      {/* Last Message Info - Simplified */}
       {lastMessage && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center gap-3">
-          <MessageSquare className="w-5 h-5 text-blue-500" />
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800/50 rounded-xl p-3 flex items-center justify-between">
           <div className="flex items-center gap-3 text-blue-700 dark:text-blue-400">
-            <span className="font-medium">Último mensaje:</span>
-            <span className="text-sm font-mono">{lastMessage.topic}</span>
-            <span className="text-xs text-blue-500 dark:text-blue-300">
-              {new Date(lastMessage.timestamp).toLocaleTimeString()}
-            </span>
+            <MessageSquare className="w-4 h-4" />
+            <span className="text-sm font-medium">Último mensaje:</span>
+            <span className="text-xs font-mono bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded">{lastMessage.topic}</span>
           </div>
+          <span className="text-xs text-blue-500 dark:text-blue-300">
+            {new Date(lastMessage.timestamp).toLocaleTimeString()}
+          </span>
         </div>
       )}
 
-      {/* Active Publishers */}
-      {sensorClients.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-              <Radio className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Publishers Activos ({sensorClients.length})
-            </h3>
+      {/* Empty State when no scenario is active */}
+      {!activeScenario && (
+        <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/30 dark:to-purple-900/30 flex items-center justify-center mb-4">
+            <MapPin className="w-8 h-8 text-indigo-400" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sensorClients.map((client, idx) => (
-              <div
-                key={idx}
-                className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[180px]">
-                      {client.clientid}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="w-3.5 h-3.5" />
-                    <span>{client.ip_address}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{new Date(client.connected_at).toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-4 pt-2">
-                    <span className="flex items-center gap-1">
-                      <ArrowDown className="w-3.5 h-3.5 text-cyan-500" />
-                      {client.recv_msg || 0}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ArrowUp className="w-3.5 h-3.5 text-amber-500" />
-                      {client.send_msg || 0}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            No hay escenario activo
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            Activa un escenario desde el panel principal para ver sus sensores en tiempo real
+          </p>
         </div>
       )}
     </div>
