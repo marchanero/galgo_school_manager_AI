@@ -385,8 +385,15 @@ export function MQTTProvider({ children }) {
   /**
    * Procesar mensajes de sensores
    */
+  // Ref para buffering de datos de sensores
+  const sensorBufferRef = useRef(new Map())
+  const lastFlushRef = useRef(Date.now())
+
+  /**
+   * Procesar mensajes de sensores con throttling
+   */
   const processSensorMessage = useCallback((topic, data) => {
-    console.log('🔧 processSensorMessage called:', topic, data)
+    // console.log('🔧 processSensorMessage called:', topic, data)
     const parts = topic.split('/')
 
     // Determinar el tipo de sensor y el ID según el formato del tópico
@@ -398,32 +405,36 @@ export function MQTTProvider({ children }) {
       sensorType = parts.slice(2, -1).join('/')
     } else {
       // Formato personalizado: location/category/deviceId/variable
-      // Ej: aula1/emotibit/EM_AABBCCDD01/hr
-      // Construir topicBase (sin el último segmento de variable)
       const topicBase = parts.slice(0, -1).join('/')
       sensorId = topicBase  // Usar topicBase como identificador único
-      sensorType = data.type || parts[parts.length - 1]  // Usar type del payload o variable
+      sensorType = data.type || parts[parts.length - 1]
     }
 
-    console.log('🔍 Parsed sensor:', { sensorType, sensorId, parts })
+    if (!sensorId) return
 
-    if (!sensorId) {
-      console.warn('⚠️ Sensor inválido - falta id:', { sensorType, sensorId })
-      return
-    }
-
-    setSensorData(prev => {
-      const newMap = new Map(prev)
-      newMap.set(sensorId, {
-        type: sensorType,
-        value: typeof data.value !== 'undefined' ? data.value : data,
-        timestamp: data.timestamp || new Date().toISOString(),
-        topic,
-        location: data.location || parts[0]
-      })
-      console.log('✅ Sensor agregado al Map:', sensorId, newMap.size, 'sensores totales')
-      return newMap
+    // Actualizar buffer en lugar de estado directo
+    sensorBufferRef.current.set(sensorId, {
+      type: sensorType,
+      value: typeof data.value !== 'undefined' ? data.value : data,
+      timestamp: data.timestamp || new Date().toISOString(),
+      topic,
+      location: data.location || parts[0]
     })
+
+    // Throttling: Solo actualizar estado React si ha pasado suficiente tiempo (ej. 100ms = 10fps)
+    const now = Date.now()
+    if (now - lastFlushRef.current >= 100) {
+      setSensorData(prev => {
+        const newMap = new Map(prev)
+        // Aplicar todas las actualizaciones pendientes del buffer
+        sensorBufferRef.current.forEach((value, key) => {
+          newMap.set(key, value)
+        })
+        sensorBufferRef.current.clear()
+        return newMap
+      })
+      lastFlushRef.current = now
+    }
   }, [])
 
   /**

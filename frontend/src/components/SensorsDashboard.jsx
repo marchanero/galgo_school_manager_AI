@@ -381,46 +381,48 @@ function SensorsDashboard() {
             {scenarioSensors.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {scenarioSensors.map((sensor) => (
-                  <div
-                    key={sensor.id}
-                    className={`relative rounded-lg p-3 min-h-[110px] flex flex-col justify-between ${sensor.isOnline
-                      ? 'bg-gray-50 dark:bg-gray-700/50 border border-emerald-200 dark:border-emerald-800/50'
-                      : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 opacity-60'
-                      }`}
-                  >
-                    {/* Status indicator */}
-                    <div className="absolute top-2 right-2">
-                      <span className={`w-2 h-2 rounded-full block ${sensor.isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
-                    </div>
-
-                    <div>
-                      {/* Icon */}
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${sensor.isOnline
-                        ? 'bg-indigo-100 dark:bg-indigo-900/30'
-                        : 'bg-gray-200 dark:bg-gray-700'
-                        }`}>
-                        {React.createElement(getSensorIcon(sensor.type), {
-                          className: sensor.isOnline ? 'w-4 h-4 text-indigo-600 dark:text-indigo-400' : 'w-4 h-4 text-gray-400'
-                        })}
+                  <SensorErrorBoundary key={sensor.id}>
+                    <div
+                      className={`relative rounded-lg p-3 min-h-[110px] flex flex-col justify-between ${sensor.isOnline
+                        ? 'bg-gray-50 dark:bg-gray-700/50 border border-emerald-200 dark:border-emerald-800/50'
+                        : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 opacity-60'
+                        }`}
+                    >
+                      {/* ... content ... */}
+                      {/* Status indicator */}
+                      <div className="absolute top-2 right-2">
+                        <span className={`w-2 h-2 rounded-full block ${sensor.isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                       </div>
 
-                      {/* Sensor name */}
-                      <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate mb-2" title={sensor.name}>
-                        {sensor.name}
-                      </h4>
-                    </div>
+                      <div>
+                        {/* Icon */}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${sensor.isOnline
+                          ? 'bg-indigo-100 dark:bg-indigo-900/30'
+                          : 'bg-gray-200 dark:bg-gray-700'
+                          }`}>
+                          {React.createElement(getSensorIcon(sensor.type), {
+                            className: sensor.isOnline ? 'w-4 h-4 text-indigo-600 dark:text-indigo-400' : 'w-4 h-4 text-gray-400'
+                          })}
+                        </div>
 
-                    {/* Value display with fixed height container to prevent jitter */}
-                    <div className={`text-lg font-bold min-h-[3rem] flex items-end ${sensor.isOnline
-                      ? 'text-gray-900 dark:text-white'
-                      : 'text-gray-400'
-                      }`}>
-                      {sensor.isOnline && sensor.liveData
-                        ? <SensorValueDisplay value={sensor.liveData.value} unit={sensor.unit} />
-                        : <span className="text-xs font-normal">--</span>
-                      }
+                        {/* Sensor name */}
+                        <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate mb-2" title={sensor.name}>
+                          {sensor.name}
+                        </h4>
+                      </div>
+
+                      {/* Value display with fixed height container to prevent jitter */}
+                      <div className={`text-lg font-bold min-h-[3rem] flex items-end ${sensor.isOnline
+                        ? 'text-gray-900 dark:text-white'
+                        : 'text-gray-400'
+                        }`}>
+                        {sensor.isOnline && sensor.liveData
+                          ? <SensorValueDisplay value={sensor.liveData.value} unit={sensor.unit} />
+                          : <span className="text-xs font-normal">--</span>
+                        }
+                      </div>
                     </div>
-                  </div>
+                  </SensorErrorBoundary>
                 ))}
               </div>
             ) : (
@@ -522,6 +524,34 @@ function SensorsDashboard() {
       )}
     </div>
   )
+}
+
+// Safe Sensor wrapper
+class SensorErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Sensor Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center justify-center min-h-[110px]">
+          <span className="text-xs text-red-500 text-center">Error renderizado</span>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default SensorsDashboard
