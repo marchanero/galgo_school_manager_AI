@@ -19,13 +19,18 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
         ws: true
+      },
+      '/ws': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true
       }
     },
     // Optimizar HMR
     hmr: {
-      host: 'localhost',
-      port: 5173,
-      protocol: 'ws'
+      // host: 'localhost', // Commented out to allow external access
+      // port: 5173,
+      // protocol: 'ws'
     }
   }
 })

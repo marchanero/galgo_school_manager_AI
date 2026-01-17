@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import mqtt from 'mqtt'
 import axios from 'axios'
 
 const MQTTConnectionContext = createContext()
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// Use relative URL to work with Vite proxy from any host
+const API_BASE = ''
 
 /**
  * MQTTConnectionProvider - Maneja conexión y reconexión al broker MQTT
@@ -51,14 +52,31 @@ export function MQTTConnectionProvider({ children }) {
             const response = await axios.get(`${API_BASE}/api/mqtt/config`)
 
             if (response.data.success) {
-                setConfig(response.data.data)
-                console.log('✅ Configuración MQTT cargada:', response.data.data.wsUrl)
-                return response.data.data
+                const mqttConfig = response.data.data
+
+                // CRITICAL FIX: Ensure WebSocket connects to the same host as the frontend
+                // Backend sends 'localhost' which fails when accessing from external network
+                try {
+                    // If config URL is valid, replace hostname
+                    const wsUrlObj = new URL(mqttConfig.wsUrl)
+                    wsUrlObj.hostname = window.location.hostname
+                    // If page is HTTPS, might need WSS (but assuming WS for now on 8083)
+                    mqttConfig.wsUrl = wsUrlObj.toString()
+                } catch (e) {
+                    // Fallback construction
+                    const port = 8083
+                    mqttConfig.wsUrl = `ws://${window.location.hostname}:${port}/mqtt`
+                }
+
+                setConfig(mqttConfig)
+                console.log('✅ Configuración MQTT cargada:', mqttConfig.wsUrl)
+                return mqttConfig
             }
         } catch (err) {
             console.warn('⚠️ Usando configuración por defecto:', err.message)
             const defaultConfig = {
-                wsUrl: import.meta.env.VITE_MQTT_WS_URL || 'ws://localhost:8083/mqtt',
+                // Dynamic default based on current location
+                wsUrl: `ws://${window.location.hostname}:8083/mqtt`,
                 username: '',
                 hasPassword: false
             }
@@ -224,6 +242,12 @@ export function MQTTConnectionProvider({ children }) {
     const getClient = useCallback(() => {
         return clientRef.current
     }, [])
+
+    // Auto-fetch config on mount
+    useEffect(() => {
+        console.log('🔧 MQTTConnectionProvider montado, cargando configuración...')
+        fetchConfig()
+    }, [fetchConfig])
 
     const value = {
         isConnected,

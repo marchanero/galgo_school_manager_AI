@@ -7,7 +7,9 @@
 import axios from 'axios'
 
 // Usar el proxy del backend para evitar CORS
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// Usar el proxy del backend para evitar CORS
+// Use relative path if VITE_API_URL is not set so it works through Vite proxy on any host
+const API_BASE = import.meta.env.VITE_API_URL || ''
 const EMQX_PROXY_BASE = `${API_BASE}/api/emqx`
 
 // Crear instancia de axios para el proxy

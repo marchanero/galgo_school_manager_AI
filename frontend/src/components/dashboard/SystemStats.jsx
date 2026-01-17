@@ -101,22 +101,39 @@ const SystemStats = ({
                         Sensores Activos
                     </h3>
                     <div className="space-y-2">
-                        {activeSensors.map((sensor) => (
-                            <div
-                                key={sensor.id}
-                                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                                        {sensor.type}
+                        {activeSensors.map((sensor) => {
+                            // Format sensor value - handle objects and primitives
+                            const formatValue = (val) => {
+                                if (val === undefined || val === null) return '-'
+                                if (typeof val === 'object') {
+                                    // For xyz coordinates like accel/gyro
+                                    if ('x' in val && 'y' in val && 'z' in val) {
+                                        return `x:${val.x?.toFixed?.(1) ?? val.x} y:${val.y?.toFixed?.(1) ?? val.y} z:${val.z?.toFixed?.(1) ?? val.z}`
+                                    }
+                                    // For other objects, just show key count
+                                    return `${Object.keys(val).length} campos`
+                                }
+                                if (typeof val === 'number') return val.toFixed(2)
+                                return String(val)
+                            }
+
+                            return (
+                                <div
+                                    key={sensor.id}
+                                    className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[120px]" title={sensor.id}>
+                                            {sensor.type || sensor.id?.split('/').pop() || 'Sensor'}
+                                        </span>
+                                    </div>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[80px]" title={String(sensor.value)}>
+                                        {formatValue(sensor.value)}
                                     </span>
                                 </div>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {sensor.value !== undefined ? sensor.value : '-'}
-                                </span>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 </div>
             )}

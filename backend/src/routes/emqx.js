@@ -12,8 +12,8 @@ const prisma = new PrismaClient()
 
 // Configuración de EMQX por defecto
 let EMQX_CONFIG = {
-  broker: process.env.MQTT_BROKER || 'mqtt://100.82.84.24:1883',
-  apiUrl: process.env.EMQX_API_URL || 'http://100.82.84.24:18083/api/v5',
+  broker: process.env.MQTT_BROKER || 'mqtt://localhost:1883',
+  apiUrl: process.env.EMQX_API_URL || 'http://localhost:18083/api/v5',
   apiKey: process.env.EMQX_API_KEY || 'admin',
   apiSecret: process.env.EMQX_API_SECRET || 'galgo2526'
 }

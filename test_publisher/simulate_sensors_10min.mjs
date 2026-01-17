@@ -7,7 +7,7 @@ const PASSWORD = 'galgo2526';
 // Configuración EmotiBit (según especificaciones)
 const FREQUENCY_HZ = 25;
 const INTERVAL_MS = 40; // 1000/25 = 40ms
-const DURATION_SEC = 600; // 10 minutos
+const DURATION_SEC = process.env.DURATION_SEC ? parseInt(process.env.DURATION_SEC) : 600; // 10 minutos por defecto
 const DURATION_MS = DURATION_SEC * 1000;
 
 // Configuración Sensores Ambientales (baja frecuencia)
@@ -109,7 +109,8 @@ client.on('connect', () => {
     const now = Date.now();
     const elapsed = now - startTime;
 
-    if (elapsed >= DURATION_MS) {
+    // Check duration only if DURATION_MS > 0
+    if (DURATION_MS > 0 && elapsed >= DURATION_MS) {
       clearInterval(fastTimer);
       clearInterval(slowTimer);
       console.log('\n✅ Simulación completada.');
