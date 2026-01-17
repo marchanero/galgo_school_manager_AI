@@ -20,7 +20,8 @@
     "build:client2": "cd client2-visualizer && npm run build"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "pm2": "^6.0.14"
   },
   "dependencies": {
     "node-cron": "^4.2.1"
