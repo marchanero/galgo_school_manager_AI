@@ -151,7 +151,8 @@ class VideoProcessor extends EventEmitter {
     }
     
     // Determinar ruta de salida
-    const videoName = path.basename(videoPath, path.extname(videoPath))
+    // Reemplazamos % con _ para evitar que FFmpeg interprete patrones (ej: %03d) en el nombre de salida
+    const videoName = path.basename(videoPath, path.extname(videoPath)).replace(/%/g, '_')
     const thumbPath = outputPath || path.join(
       THUMBNAILS_DIR,
       `${videoName}_thumb.${this.config.thumbnailFormat}`

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
+import SyncProgressBar from './SyncProgressBar'
 
 export default function BackupPanel() {
   const [status, setStatus] = useState(null)
@@ -177,17 +178,15 @@ export default function BackupPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${
-            status?.remoteStatus === 'online' 
-              ? 'bg-green-100 dark:bg-green-900/30' 
-              : 'bg-red-100 dark:bg-red-900/30'
-          }`}>
-            <svg className={`w-6 h-6 ${
-              status?.remoteStatus === 'online' 
-                ? 'text-green-600 dark:text-green-400' 
-                : 'text-red-600 dark:text-red-400'
-            }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+          <div className={`p-2 rounded-lg ${status?.remoteStatus === 'online'
+            ? 'bg-green-100 dark:bg-green-900/30'
+            : 'bg-red-100 dark:bg-red-900/30'
+            }`}>
+            <svg className={`w-6 h-6 ${status?.remoteStatus === 'online'
+              ? 'text-green-600 dark:text-green-400'
+              : 'text-red-600 dark:text-red-400'
+              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
             </svg>
           </div>
@@ -207,7 +206,7 @@ export default function BackupPanel() {
             className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -243,7 +242,7 @@ export default function BackupPanel() {
             ) : (
               <>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 Sincronizar Ahora
@@ -255,11 +254,10 @@ export default function BackupPanel() {
 
       {/* Test Connection Result */}
       {testResult && (
-        <div className={`p-4 rounded-lg ${
-          testResult.success 
-            ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-            : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-        }`}>
+        <div className={`p-4 rounded-lg ${testResult.success
+          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+          : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+          }`}>
           <div className="flex items-center gap-2">
             {testResult.success ? (
               <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,7 +287,7 @@ export default function BackupPanel() {
       {showConfig && (
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 space-y-4">
           <h4 className="font-medium text-gray-900 dark:text-white">Configuración de Backup</h4>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -587,13 +585,15 @@ export default function BackupPanel() {
       )}
 
       {/* Stats Grid */}
+      <SyncProgressBar />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Local Storage */}
         <div className={`p-4 rounded-lg bg-${getStatusColor(status?.localDiskInfo?.usePercent || 0)}-50 dark:bg-${getStatusColor(status?.localDiskInfo?.usePercent || 0)}-900/20`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Almacenamiento Local</span>
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
             </svg>
           </div>
@@ -606,7 +606,7 @@ export default function BackupPanel() {
           {status?.localDiskInfo?.available && (
             <div className="mt-2">
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
+                <div
                   className={`h-2 rounded-full transition-all bg-${getStatusColor(status.localDiskInfo.usePercent)}-500`}
                   style={{ width: `${status.localDiskInfo.usePercent}%` }}
                 ></div>
@@ -619,16 +619,14 @@ export default function BackupPanel() {
         </div>
 
         {/* Remote Storage */}
-        <div className={`p-4 rounded-lg ${
-          status?.remoteDiskInfo?.available 
-            ? `bg-${getStatusColor(status.remoteDiskInfo.usePercent)}-50 dark:bg-${getStatusColor(status.remoteDiskInfo.usePercent)}-900/20`
-            : 'bg-gray-50 dark:bg-gray-700/50'
-        }`}>
+        <div className={`p-4 rounded-lg ${status?.remoteDiskInfo?.available
+          ? `bg-${getStatusColor(status.remoteDiskInfo.usePercent)}-50 dark:bg-${getStatusColor(status.remoteDiskInfo.usePercent)}-900/20`
+          : 'bg-gray-50 dark:bg-gray-700/50'
+          }`}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Servidor Remoto</span>
-            <div className={`w-2 h-2 rounded-full ${
-              status?.remoteStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
-            }`}></div>
+            <div className={`w-2 h-2 rounded-full ${status?.remoteStatus === 'online' ? 'bg-green-500' : 'bg-red-500'
+              }`}></div>
           </div>
           {status?.remoteDiskInfo?.available ? (
             <>
@@ -643,11 +641,10 @@ export default function BackupPanel() {
               </div>
               <div className="mt-2">
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                  <div 
-                    className={`h-2 rounded-full transition-all ${
-                      status.remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                  <div
+                    className={`h-2 rounded-full transition-all ${status.remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
                       status.remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-                    }`}
+                      }`}
                     style={{ width: `${status.remoteDiskInfo.usePercent}%` }}
                   ></div>
                 </div>
@@ -669,7 +666,7 @@ export default function BackupPanel() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Pendientes</span>
             <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
@@ -686,7 +683,7 @@ export default function BackupPanel() {
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-purple-600 dark:text-purple-400">Última Sync</span>
             <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
@@ -726,11 +723,10 @@ export default function BackupPanel() {
             </div>
             <div>
               <span className="text-gray-500 dark:text-gray-400">Verificar Hash:</span>
-              <span className={`ml-2 font-medium ${
-                status.transferConfig.verifyHash 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : 'text-gray-500'
-              }`}>
+              <span className={`ml-2 font-medium ${status.transferConfig.verifyHash
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-gray-500'
+                }`}>
                 {status.transferConfig.verifyHash ? 'Sí' : 'No'}
               </span>
             </div>
