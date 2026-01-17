@@ -23,9 +23,9 @@ export default defineConfig({
     },
     // Optimizar HMR
     hmr: {
-      host: 'localhost',
-      port: 5173,
-      protocol: 'ws'
+      // host: 'localhost', // Commented out to allow external access
+      // port: 5173,
+      // protocol: 'ws'
     }
   }
 })
