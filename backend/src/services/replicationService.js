@@ -628,10 +628,18 @@ class ReplicationService {
   async getLocalDiskInfo() {
     try {
       const { execSync } = await import('child_process')
-      // Try recordings path first, fall back to mount path
-      const localPath = process.env.RECORDINGS_PATH || replicationConfig.mountPath || '/srv/galgovideo'
+      const path = await import('path')
+      
+      // Use logical recordings path used by recordingManager
+      const localPath = process.env.RECORDINGS_PATH || path.default.join(process.cwd(), 'recordings')
+      
+      // Ensure directory exists for df
+      if (!fs.existsSync(localPath)) {
+        fs.mkdirSync(localPath, { recursive: true })
+      }
       
       // df -B1 para obtener bytes exactos
+      // Fallback to / if path fails (unlikely if mkdir works)
       const result = execSync(`df -B1 "${localPath}" 2>/dev/null || df -B1 / 2>/dev/null || echo "0 0 0 0%"`, { encoding: 'utf-8' })
       const lines = result.trim().split('\n')
       const lastLine = lines[lines.length - 1]
@@ -691,8 +699,11 @@ class ReplicationService {
    */
   async getPendingFilesCount() {
     try {
-      const localPath = process.env.RECORDINGS_PATH || '/srv/recordings'
+      const path = await import('path')
+      const localPath = process.env.RECORDINGS_PATH || path.default.join(process.cwd(), 'recordings')
       const { execSync } = await import('child_process')
+      
+      if (!fs.existsSync(localPath)) return 0
       
       // Contar archivos de video en el directorio local
       const result = execSync(
