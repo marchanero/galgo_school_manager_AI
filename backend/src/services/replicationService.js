@@ -739,7 +739,38 @@ class ReplicationService {
     // Mock mode para pruebas
     if (replicationConfig.useMock && !isMount) {
       console.log('🔧 Modo MOCK: simulando replicación...')
-      await new Promise(r => setTimeout(r, 2000))
+      this.isReplicating = true
+      
+      const totalSteps = 20
+      const totalSize = 1024 * 1024 * 1024 * 5.2 // 5.2 GB
+      
+      for (let i = 1; i <= totalSteps; i++) {
+        await new Promise(r => setTimeout(r, 250)) // 5 segundos total
+        
+        const percent = Math.round((i / totalSteps) * 100)
+        const transferred = Math.round((totalSize * percent) / 100)
+        
+        const progressData = {
+          transferred: this._formatBytes(transferred),
+          total: this._formatBytes(totalSize),
+          percent,
+          speed: '125 MB/s',
+          eta: `${Math.ceil((totalSteps - i) * 0.25)}s`
+        }
+        
+        // Actualizar estado interno y emitir
+        this.currentProgress = progressData
+        if (this.io) {
+          this.io.emit('replication:progress', progressData)
+        }
+      }
+      
+      if (this.io) {
+        this.io.emit('replication:complete', { success: true })
+      }
+      
+      this.isReplicating = false
+      this.currentProgress = null
       await this.updateLastSyncTime()
       return { success: true, message: 'Replicación simulada (mock)', isMock: true }
     }
@@ -1295,6 +1326,14 @@ class ReplicationService {
       console.error('Error calculando archivos pendientes:', error)
       return -1 // Error
     }
+  }
+
+  _formatBytes(bytes) {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 }
 
