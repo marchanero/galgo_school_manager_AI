@@ -35,8 +35,9 @@ class RecordingManager extends EventEmitter {
       staleTimeout: 60000,        // Considerar muerto si no hay actividad en 60s
       
       // Segmentación optimizada para memoria
-      segmentTime: 300,           // 5 minutos por archivo (antes 1 hora)
-                                  // Reduce uso de memoria y riesgo de pérdida
+      // Segmentación optimizada para memoria
+      segmentTime: 3600,          // 1 hora por archivo (antes 5 min)
+                                  // Evita que el usuario perciba "cortes" cada 5 min
       
       // Límites de memoria FFmpeg
       inputBufferSize: '16M',     // Buffer de entrada RTSP (antes ilimitado)
