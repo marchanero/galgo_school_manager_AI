@@ -1,7 +1,7 @@
 import { Settings, Theater, Radio, Wifi, FolderSync, HardDrive, Film, Clapperboard, Gauge } from 'lucide-react'
 import ScenarioManager from '../ScenarioManager'
 import SensorManager from '../SensorManager'
-import MQ from '../MQTTConfig'
+import MQTTConfig from '../MQTTConfig'
 import BackupPanel from '../BackupPanel'
 import StorageManager from '../StorageManager'
 import RecordingDashboard from '../RecordingDashboard'
