@@ -62,6 +62,31 @@ export default function SyncProgressBar({ status }) {
         }
     }, [])
 
+    useEffect(() => {
+        if (status?.isReplicating) {
+            setIsReplicating(true)
+            // Si ya tenemos progreso guardado en el status, usarlo
+            if (status.currentProgress) {
+                setProgress(status.currentProgress)
+            } else if (!progress) {
+                // Estado "Cargando/Preparando" si sabemos que está replicando pero no hay datos aún
+                setProgress({
+                    percent: 0,
+                    speed: 'Iniciando...',
+                    eta: 'Calculando...',
+                    transferred: '0 B',
+                    total: '...'
+                })
+            }
+        } else if (status?.isReplicating === false && isReplicating) {
+            // Si el status dice que terminó pero nosotros seguíamos replicando
+            setIsReplicating(false)
+            setIsComplete(true)
+            setTimeout(() => setIsComplete(false), 5000)
+            setLastSync(new Date())
+        }
+    }, [status, isReplicating, progress])
+
     const formatDate = (dateStr) => {
         if (!dateStr) return 'Nunca'
         return new Date(dateStr).toLocaleString('es-ES', {
@@ -69,7 +94,7 @@ export default function SyncProgressBar({ status }) {
         })
     }
 
-    // Estado: Sincronizando activamente
+    // Estado: Sincronizando activamente (Mostramos incluso si el progreso es dummy/inicial)
     if (isReplicating && progress) {
         return (
             <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 dark:from-blue-900/30 dark:to-purple-900/30 rounded-xl p-4 border border-blue-200 dark:border-blue-800 shadow-sm">
