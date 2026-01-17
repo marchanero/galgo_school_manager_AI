@@ -46,12 +46,12 @@ class SyncRecordingService extends EventEmitter {
     
     try {
       // 1. Buscar grabaciones que quedaron abiertas (zombies)
+      // Nota: Recording no tiene relación directa con Camera, solo cameraId
       const zombieRecordings = await prismaClient.recording.findMany({
         where: {
           endTime: null
         },
         include: {
-          camera: true,
           scenario: true
         }
       })
@@ -62,7 +62,17 @@ class SyncRecordingService extends EventEmitter {
       
       // 2. Procesar cada grabación interrumpida
       for (const recording of zombieRecordings) {
-        console.log(`🩹 Recuperando grabación interrumpida para cámara ${recording.camera.name} (ID: ${recording.cameraId})`)
+        // Obtener cámara por separado ya que no hay relación definida en el schema
+        const camera = await prismaClient.camera.findUnique({
+          where: { id: recording.cameraId }
+        })
+        
+        if (!camera) {
+          console.log(`⚠️ Cámara ${recording.cameraId} no encontrada, omitiendo grabación ${recording.id}`)
+          continue
+        }
+        
+        console.log(`🩹 Recuperando grabación interrumpida para cámara ${camera.name} (ID: ${recording.cameraId})`)
         
         // A. Cerrar la grabación anterior en BD
         await prismaClient.recording.update({
@@ -78,16 +88,16 @@ class SyncRecordingService extends EventEmitter {
         })
         
         // B. Reiniciar la grabación automáticamente
-        if (recording.camera && recording.camera.isActive) {
-          console.log(`▶️ Reiniciando grabación automáticamente para: ${recording.camera.name}`)
+        if (camera && camera.isActive) {
+          console.log(`▶️ Reiniciando grabación automáticamente para: ${camera.name}`)
           
           // Esperar un momento para asegurar que otros servicios (RTSP, etc) estén listos
           setTimeout(() => {
-            this.startSyncRecording(recording.camera, {
+            this.startSyncRecording(camera, {
               scenarioId: recording.scenarioId,
               scenarioName: recording.scenario ? recording.scenario.name : null,
               // Mantener topics si estuvieran en metadata (opcional)
-            }).catch(err => console.error(`❌ Error reiniciando grabación ${recording.camera.name}:`, err))
+            }).catch(err => console.error(`❌ Error reiniciando grabación ${camera.name}:`, err))
           }, 5000)
         }
       }

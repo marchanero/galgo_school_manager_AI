@@ -16,6 +16,7 @@ import replicationRoutes from './routes/replication.js'
 import emqxRoutes from './routes/emqx.js'
 import storageRoutes from './routes/storage.js'
 import recordingsRoutes from './routes/recordings.js'
+import syncRoutes from './routes/sync.js'
 import processingRoutes from './routes/processing.js'
 import performanceRoutes from './routes/performance.js'
 import StreamingService from './utils/streamingService.js'
@@ -406,6 +407,7 @@ app.use('/api/replication', replicationRoutes)
 app.use('/api/emqx', emqxRoutes)
 app.use('/api/storage', storageRoutes)
 app.use('/api/recordings', recordingsRoutes)
+app.use('/api/sync', syncRoutes)
 app.use('/api/processing', processingRoutes)
 app.use('/api/performance', performanceRoutes)
 
