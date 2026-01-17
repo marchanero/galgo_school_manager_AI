@@ -387,13 +387,30 @@ export function MQTTProvider({ children }) {
    */
   // Ref para buffering de datos de sensores
   const sensorBufferRef = useRef(new Map())
-  const lastFlushRef = useRef(Date.now())
+
+  // Efecto para hacer flush del buffer periódicamente (Throttling desacoplado)
+  useEffect(() => {
+    const flushInterval = setInterval(() => {
+      if (sensorBufferRef.current.size > 0) {
+        setSensorData(prev => {
+          const newMap = new Map(prev)
+          // Aplicar actualizaciones
+          sensorBufferRef.current.forEach((value, key) => {
+            newMap.set(key, value)
+          })
+          sensorBufferRef.current.clear()
+          return newMap
+        })
+      }
+    }, 200) // 5 FPS (200ms) es suficiente para visualización humana y muy ligero para React
+
+    return () => clearInterval(flushInterval)
+  }, [])
 
   /**
-   * Procesar mensajes de sensores con throttling
+   * Procesar mensajes de sensores (Ultra-fast path)
    */
   const processSensorMessage = useCallback((topic, data) => {
-    // console.log('🔧 processSensorMessage called:', topic, data)
     const parts = topic.split('/')
 
     // Determinar el tipo de sensor y el ID según el formato del tópico
@@ -412,7 +429,7 @@ export function MQTTProvider({ children }) {
 
     if (!sensorId) return
 
-    // Actualizar buffer en lugar de estado directo
+    // Simplemente guardar en buffer, sin lógica de tiempo
     sensorBufferRef.current.set(sensorId, {
       type: sensorType,
       value: typeof data.value !== 'undefined' ? data.value : data,
@@ -420,21 +437,6 @@ export function MQTTProvider({ children }) {
       topic,
       location: data.location || parts[0]
     })
-
-    // Throttling: Solo actualizar estado React si ha pasado suficiente tiempo (ej. 100ms = 10fps)
-    const now = Date.now()
-    if (now - lastFlushRef.current >= 100) {
-      setSensorData(prev => {
-        const newMap = new Map(prev)
-        // Aplicar todas las actualizaciones pendientes del buffer
-        sensorBufferRef.current.forEach((value, key) => {
-          newMap.set(key, value)
-        })
-        sensorBufferRef.current.clear()
-        return newMap
-      })
-      lastFlushRef.current = now
-    }
   }, [])
 
   /**
