@@ -322,41 +322,15 @@ syncRecordingService.init(prisma).then(() => {
   console.error('❌ Error inicializando grabación sincronizada:', err)
 })
 
-// Auto-iniciar grabación para cámaras existentes
-// ⚠️ DESHABILITADO: El auto-inicio siempre graba sin escenario
-// Las grabaciones deben iniciarse manualmente desde el frontend para incluir el escenario activo
-const autoStartRecordings = async () => {
+// Verificar cámaras activas (Inicia grabación manualmente desde el frontend para incluir escenario)
+const logActiveCameras = async () => {
   try {
     const cameras = await prisma.camera.findMany({
       where: { isActive: true }
     })
     
     if (cameras.length > 0) {
-      console.log(`📹 Encontradas ${cameras.length} cámara(s) activa(s)`)
-      console.log('ℹ️ Auto-inicio DESHABILITADO - Inicia grabación desde el frontend para aplicar escenario')
-      
-      // NO iniciar automáticamente - esperar comando del frontend
-      // for (const camera of cameras) {
-      //   try {
-      //     if (mediaServerManager.isRecording(camera.id)) {
-      //       console.log(`⏭️ Grabación ya activa: ${camera.name} (omitiendo)`)
-      //       continue
-      //     }
-      //     
-      //     mediaServerManager.startCamera(camera)
-      //     console.log(`✅ Grabación iniciada: ${camera.name}`)
-      //     
-      //     await mqttService.publish(`camera_rtsp/cameras/${camera.id}/recording/status`, {
-      //       status: 'recording',
-      //       camera: camera.name,
-      //       startedAt: new Date().toISOString(),
-      //       autoStart: true
-      //     }).catch(err => console.error('Error publicando a MQTT:', err))
-      //     
-      //   } catch (error) {
-      //     console.error(`❌ Error iniciando ${camera.name}:`, error.message)
-      //   }
-      // }
+      console.log(`📹 Encontradas ${cameras.length} cámara(s) activa(s). (Auto-inicio deshabilitado)`)
     } else {
       console.log('ℹ️ No hay cámaras activas configuradas')
     }
@@ -365,8 +339,8 @@ const autoStartRecordings = async () => {
   }
 }
 
-// Verificar cámaras disponibles (sin auto-iniciar)
-setTimeout(autoStartRecordings, 2000)
+// Verificar cámaras disponibles al iniciar
+setTimeout(logActiveCameras, 2000)
 
 // Middleware
 app.use(cors())
