@@ -414,7 +414,7 @@ function SensorsDashboard() {
                       : 'text-gray-400'
                       }`}>
                       {sensor.isOnline && sensor.liveData
-                        ? <span className="tabular-nums">{sensor.liveData.value?.toFixed(1) || '--'} <span className="text-xs font-normal text-gray-500">{sensor.unit || ''}</span></span>
+                        ? <SensorValueDisplay value={sensor.liveData.value} unit={sensor.unit} />
                         : <span className="text-xs font-normal">--</span>
                       }
                     </div>
@@ -523,3 +523,32 @@ function SensorsDashboard() {
 }
 
 export default SensorsDashboard
+// Helper component to display sensor values safely (handles numbers and objects/vectors)
+function SensorValueDisplay({ value, unit }) {
+  if (value === null || value === undefined) return <span>--</span>;
+
+  // Si es un objeto (vector X,Y,Z como acelerómetro)
+  if (typeof value === 'object') {
+    return (
+      <div className="flex flex-col text-xs font-mono font-normal">
+        {Object.entries(value).map(([key, val]) => (
+          <span key={key}>
+            <span className="text-gray-500 uppercase">{key}:</span> {typeof val === 'number' ? val.toFixed(2) : val}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
+  // Si es un número escalar
+  if (typeof value === 'number') {
+    return (
+      <span className="tabular-nums">
+        {value.toFixed(1)} <span className="text-xs font-normal text-gray-500">{unit || ''}</span>
+      </span>
+    )
+  }
+
+  // Fallback para strings u otros tipos
+  return <span>{String(value)}</span>
+}
