@@ -23,6 +23,14 @@ export const streamPaths = {
 export const replication = {
   // Configuración básica
   enabled: process.env.REPLICATION_ENABLED === 'true',
+  
+  // Tipo de destino: 'mount' (local), 'rclone', 'rsync-ssh'
+  destinationType: process.env.REPLICATION_DESTINATION_TYPE || 'mount',
+  
+  // Para tipo 'mount': ruta del punto de montaje SMB/NFS
+  mountPath: process.env.REPLICATION_MOUNT_PATH || '/srv/galgovideo',
+  
+  // Para tipo 'rclone' o 'rsync-ssh': configuración de red
   host: process.env.REPLICATION_HOST,
   port: parseInt(process.env.REPLICATION_PORT) || 22,
   user: process.env.REPLICATION_USER,
@@ -30,7 +38,7 @@ export const replication = {
   remotePath: process.env.REPLICATION_PATH,
   sshKeyPath: process.env.REPLICATION_SSH_KEY,
   
-  // Motor de transferencia
+  // Motor de transferencia (para tipos de red)
   engine: process.env.REPLICATION_ENGINE || 'rclone', // 'rclone' o 'rsync'
   rcloneRemote: process.env.REPLICATION_RCLONE_REMOTE || 'truenas',
   

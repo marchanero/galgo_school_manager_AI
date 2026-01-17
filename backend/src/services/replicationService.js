@@ -96,9 +96,14 @@ class ReplicationService {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Verifica espacio disponible en servidor remoto via SSH
+   * Verifica espacio disponible en destino (montaje local o servidor remoto via SSH)
    */
   async checkRemoteSpace() {
+    // Para tipo 'mount': usar df directamente en el montaje local
+    if (replicationConfig.destinationType === 'mount') {
+      return this.checkMountSpace()
+    }
+    
     if (replicationConfig.useMock || !replicationConfig.host) {
       return this.getMockRemoteSpace()
     }
@@ -135,6 +140,49 @@ class ReplicationService {
       }
     } catch (error) {
       console.error(`❌ Error verificando espacio remoto: ${error.message}`)
+      return { available: false, error: error.message, canTransfer: false }
+    }
+  }
+  
+  /**
+   * Verifica espacio en punto de montaje SMB/NFS local
+   */
+  async checkMountSpace() {
+    const mountPath = replicationConfig.mountPath
+    
+    // Verificar si el montaje existe
+    if (!fs.existsSync(mountPath)) {
+      return { available: false, error: `Punto de montaje no existe: ${mountPath}`, canTransfer: false }
+    }
+    
+    try {
+      const { stdout } = await exec(`df -B1 '${mountPath}' --output=size,used,avail,pcent | tail -n 1`)
+      const parts = stdout.trim().split(/\s+/)
+      
+      const total = parseInt(parts[0], 10)
+      const used = parseInt(parts[1], 10)
+      const available = parseInt(parts[2], 10)
+      const usePercent = parseInt((parts[3] || '0').replace('%', ''), 10)
+      
+      return {
+        available: true,
+        isMount: true,
+        mountPath,
+        total,
+        used,
+        free: available,
+        usePercent,
+        totalGB: Math.round(total / 1024 / 1024 / 1024),
+        usedGB: Math.round(used / 1024 / 1024 / 1024),
+        freeGB: Math.round(available / 1024 / 1024 / 1024),
+        totalTB: (total / 1024 / 1024 / 1024 / 1024).toFixed(2),
+        freeTB: (available / 1024 / 1024 / 1024 / 1024).toFixed(2),
+        canTransfer: usePercent < replicationConfig.remoteMaxUsePercent,
+        isCritical: usePercent >= replicationConfig.remoteCriticalPercent,
+        lastChecked: new Date().toISOString()
+      }
+    } catch (error) {
+      console.error(`❌ Error verificando espacio en montaje: ${error.message}`)
       return { available: false, error: error.message, canTransfer: false }
     }
   }
@@ -281,8 +329,10 @@ class ReplicationService {
           throw new Error(`Espacio insuficiente en servidor remoto (${spaceCheck.usePercent}% usado)`)
         }
         
-        // 2. Ejecutar transferencia
-        if (replicationConfig.engine === 'rclone') {
+        // 2. Ejecutar transferencia según tipo de destino
+        if (replicationConfig.destinationType === 'mount') {
+          await this.mountCopy(localPath, remotePath)
+        } else if (replicationConfig.engine === 'rclone') {
           await this.rcloneCopy(localPath, remotePath)
         } else {
           await this.rsyncCopy(localPath, remotePath)
@@ -370,6 +420,64 @@ class ReplicationService {
       proc.on('close', (code) => {
         if (code === 0) {
           resolve({ success: true })
+        } else {
+          reject(new Error(`rsync terminó con código ${code}: ${stderr.slice(-500)}`))
+        }
+      })
+      
+      proc.on('error', reject)
+    })
+  }
+
+  /**
+   * Copia archivos a un punto de montaje local (SMB/NFS)
+   * Usa rsync local para sincronización incremental eficiente
+   */
+  mountCopy(localPath, remotePath) {
+    return new Promise((resolve, reject) => {
+      const { mountPath } = replicationConfig
+      const fullRemotePath = path.join(mountPath, remotePath)
+      
+      // Crear directorio destino si no existe
+      if (!fs.existsSync(fullRemotePath)) {
+        fs.mkdirSync(fullRemotePath, { recursive: true })
+      }
+      
+      const args = [
+        '-av',
+        '--partial',
+        '--inplace',
+        '--progress',
+        localPath.endsWith('/') ? localPath : localPath + '/',
+        fullRemotePath + '/'
+      ]
+      
+      console.log(`🚀 Ejecutando: rsync (local mount) ${localPath} -> ${fullRemotePath}`)
+      
+      const proc = spawn('rsync', args)
+      let stderr = ''
+      let bytesTransferred = 0
+      
+      proc.stdout.on('data', (data) => {
+        const line = data.toString().trim()
+        // Capturar progreso
+        const match = line.match(/(\d+,?\d*)\s+\d+%/)
+        if (match) {
+          bytesTransferred = parseInt(match[1].replace(/,/g, ''), 10)
+        }
+        if (!line.includes('%') && line.length > 0 && line.length < 100) {
+          console.log(`[rsync] ${line}`)
+        }
+      })
+      
+      proc.stderr.on('data', (data) => {
+        stderr += data.toString()
+      })
+      
+      proc.on('close', (code) => {
+        if (code === 0) {
+          this.transferStats.totalTransferred += bytesTransferred
+          resolve({ success: true, bytesTransferred })
         } else {
           reject(new Error(`rsync terminó con código ${code}: ${stderr.slice(-500)}`))
         }
@@ -568,8 +676,8 @@ class ReplicationService {
   }
 
   /**
-   * Inicia la replicación de grabaciones al servidor remoto
-   * Usa rclone (recomendado) o rsync según configuración
+   * Inicia la replicación de grabaciones al servidor remoto o montaje local
+   * Usa rclone, rsync (SSH) o rsync local (montaje) según configuración
    * @param {Object} options - Opciones de replicación
    * @param {boolean} options.force - Forzar replicación aunque haya una en curso
    */
@@ -579,14 +687,21 @@ class ReplicationService {
       return { success: false, message: 'Replicación en curso' }
     }
 
-    // Verificar si está habilitado
-    if (!replicationConfig.host && !replicationConfig.useMock) {
+    // Verificar configuración según tipo de destino
+    const isMount = replicationConfig.destinationType === 'mount'
+    
+    if (!isMount && !replicationConfig.host && !replicationConfig.useMock) {
       console.log('⚠️ Replicación no configurada (faltan credenciales)')
       return { success: false, message: 'Faltan credenciales de replicación' }
     }
+    
+    if (isMount && !fs.existsSync(replicationConfig.mountPath)) {
+      console.log(`⚠️ Punto de montaje no disponible: ${replicationConfig.mountPath}`)
+      return { success: false, message: `Montaje no disponible: ${replicationConfig.mountPath}` }
+    }
 
     // Mock mode para pruebas
-    if (replicationConfig.useMock) {
+    if (replicationConfig.useMock && !isMount) {
       console.log('🔧 Modo MOCK: simulando replicación...')
       await new Promise(r => setTimeout(r, 2000))
       await this.updateLastSyncTime()
@@ -594,10 +709,12 @@ class ReplicationService {
     }
 
     this.isReplicating = true
-    console.log(`🔄 Iniciando replicación con ${replicationConfig.engine}...`)
+    const transferMethod = isMount ? 'mount' : replicationConfig.engine
+    console.log(`🔄 Iniciando replicación con ${transferMethod}...`)
 
     try {
-      const { remotePath } = replicationConfig
+      // Para mount, usamos 'recordings' como ruta relativa; para remoto, usamos remotePath
+      const remotePath = isMount ? 'recordings' : replicationConfig.remotePath
       const localPath = path.join(process.cwd(), 'recordings')
       
       // 1. Verificar espacio remoto antes de empezar
