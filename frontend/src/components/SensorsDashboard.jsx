@@ -286,6 +286,32 @@ function SensorsDashboard() {
 
     // Para otros tipos de sensores
     const value = data.value || data
+
+    // Handle object values (like accelerometer {x, y, z})
+    if (typeof value === 'object' && value !== null) {
+      if ('x' in value && 'y' in value && 'z' in value) {
+        return (
+          <div className="flex flex-col text-xs font-mono">
+            <span><span className="text-gray-500">X:</span> {typeof value.x === 'number' ? value.x.toFixed(2) : value.x}</span>
+            <span><span className="text-gray-500">Y:</span> {typeof value.y === 'number' ? value.y.toFixed(2) : value.y}</span>
+            <span><span className="text-gray-500">Z:</span> {typeof value.z === 'number' ? value.z.toFixed(2) : value.z}</span>
+            {sensor.unit && <span className="text-gray-400">{sensor.unit}</span>}
+          </div>
+        )
+      }
+      // For other objects, show formatted key-value pairs
+      return (
+        <div className="flex flex-col text-xs font-mono">
+          {Object.entries(value).slice(0, 5).map(([key, val]) => (
+            <span key={key}>
+              <span className="text-gray-500">{key}:</span> {typeof val === 'number' ? val.toFixed(2) : String(val)}
+            </span>
+          ))}
+          {Object.keys(value).length > 5 && <span className="text-gray-400">+{Object.keys(value).length - 5} más</span>}
+        </div>
+      )
+    }
+
     return `${value || 'N/A'} ${sensor.unit || ''}`
   }
 
@@ -499,8 +525,7 @@ function SensorsDashboard() {
 
                       {/* Value */}
                       <div className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
-                        {data?.value?.toFixed?.(1) || data?.value || '--'}
-                        {sensor.unit && <span className="text-xs font-normal text-gray-500 ml-1">{sensor.unit}</span>}
+                        <SensorValueDisplay value={data?.value} unit={sensor.unit} />
                       </div>
                     </div>
                   )
@@ -557,6 +582,20 @@ class SensorErrorBoundary extends React.Component {
 export default SensorsDashboard
 // Helper component to display sensor values safely (handles numbers and objects/vectors)
 function SensorValueDisplay({ value, unit }) {
+  // Helper to safely format any value to a string
+  const formatVal = (val) => {
+    if (val === null || val === undefined) return '--'
+    if (typeof val === 'number') return val.toFixed(2)
+    if (typeof val === 'object') {
+      // Handle nested objects by converting to string representation
+      if ('x' in val && 'y' in val && 'z' in val) {
+        return `x:${formatVal(val.x)} y:${formatVal(val.y)} z:${formatVal(val.z)}`
+      }
+      return JSON.stringify(val)
+    }
+    return String(val)
+  }
+
   if (value === null || value === undefined) return <span>--</span>;
 
   // Si es un objeto (vector X,Y,Z como acelerómetro)
@@ -565,7 +604,7 @@ function SensorValueDisplay({ value, unit }) {
       <div className="flex flex-col text-xs font-mono font-normal">
         {Object.entries(value).map(([key, val]) => (
           <span key={key}>
-            <span className="text-gray-500 uppercase">{key}:</span> {typeof val === 'number' ? val.toFixed(2) : val}
+            <span className="text-gray-500 uppercase">{key}:</span> {formatVal(val)}
             {unit && <span className="text-gray-400 ml-0.5">{unit}</span>}
           </span>
         ))}

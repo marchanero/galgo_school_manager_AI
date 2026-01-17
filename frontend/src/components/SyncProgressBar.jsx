@@ -8,10 +8,11 @@ export default function SyncProgressBar({ status }) {
     const [lastSync, setLastSync] = useState(null)
 
     useEffect(() => {
-        // Conectar Socket.IO
-        const socket = io({
+        // Conectar Socket.IO - usar URL relativa para que pase por el proxy de Vite
+        // En desarrollo, Vite proxea /socket.io al backend (localhost:3000)
+        const socket = io(window.location.origin, {
             path: '/socket.io',
-            transports: ['websocket', 'polling']
+            transports: ['polling', 'websocket']  // Polling primero para mejor compatibilidad con proxy
         })
 
         socket.on('connect', () => {

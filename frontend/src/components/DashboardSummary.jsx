@@ -65,7 +65,6 @@ const DashboardSummary = () => {
     downloadRecording,
     deleteRecording,
     activeRecordingsCount,
-    syncRecordingStatus,
     startAllRecordings,
     stopAllRecordings,
     getMaxElapsedSeconds,
@@ -257,9 +256,8 @@ const DashboardSummary = () => {
           setSelectedCameraId(cameraToSelect.id)
         }
 
-        data.forEach(camera => {
-          syncRecordingStatus(camera.id, camera.name)
-        })
+        // No llamar syncRecordingStatus aquí - la sincronización inicial
+        // ya se hace en RecordingContext usando /api/recordings/sync/status
 
         data.forEach(async (camera) => {
           try {
@@ -281,7 +279,7 @@ const DashboardSummary = () => {
     fetchCameras()
     const interval = setInterval(fetchCameras, 60000)
     return () => clearInterval(interval)
-  }, [syncRecordingStatus, selectedCameraId])
+  }, [selectedCameraId])
 
   // Load sync status
   useEffect(() => {

@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react'
 import mqtt from 'mqtt'
 import axios from 'axios'
 
 const MQTTConnectionContext = createContext()
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+// Use relative URL to work with Vite proxy from any host
+const API_BASE = ''
 
 /**
  * MQTTConnectionProvider - Maneja conexión y reconexión al broker MQTT
@@ -241,6 +242,12 @@ export function MQTTConnectionProvider({ children }) {
     const getClient = useCallback(() => {
         return clientRef.current
     }, [])
+
+    // Auto-fetch config on mount
+    useEffect(() => {
+        console.log('🔧 MQTTConnectionProvider montado, cargando configuración...')
+        fetchConfig()
+    }, [fetchConfig])
 
     const value = {
         isConnected,

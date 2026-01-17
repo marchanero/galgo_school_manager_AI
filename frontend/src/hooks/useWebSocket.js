@@ -11,7 +11,9 @@ function useWebSocket(url) {
   useEffect(() => {
     const connect = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const wsUrl = `${protocol}//localhost:3000/ws`
+      // Usar el hostname actual para funcionar desde cualquier dispositivo
+      // El proxy de Vite redirige /ws al backend
+      const wsUrl = `${protocol}//${window.location.host}/ws`
 
       try {
         ws.current = new WebSocket(wsUrl)
