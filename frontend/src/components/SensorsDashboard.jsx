@@ -536,6 +536,7 @@ function SensorValueDisplay({ value, unit }) {
         {Object.entries(value).map(([key, val]) => (
           <span key={key}>
             <span className="text-gray-500 uppercase">{key}:</span> {typeof val === 'number' ? val.toFixed(2) : val}
+            {unit && <span className="text-gray-400 ml-0.5">{unit}</span>}
           </span>
         ))}
       </div>

@@ -63,13 +63,13 @@ export default function SyncProgressBar({ status }) {
     }, [])
 
     useEffect(() => {
-        if (status?.isReplicating) {
+        // Solo actualizar desde status si NO estamos replicando activamente por socket
+        // Esto evita que un poll "viejo" mate el estado "nuevo" del socket
+        if (status?.isReplicating && !isReplicating) {
             setIsReplicating(true)
-            // Si ya tenemos progreso guardado en el status, usarlo
             if (status.currentProgress) {
                 setProgress(status.currentProgress)
-            } else if (!progress) {
-                // Estado "Cargando/Preparando" si sabemos que está replicando pero no hay datos aún
+            } else {
                 setProgress({
                     percent: 0,
                     speed: 'Iniciando...',
@@ -78,14 +78,8 @@ export default function SyncProgressBar({ status }) {
                     total: '...'
                 })
             }
-        } else if (status?.isReplicating === false && isReplicating) {
-            // Si el status dice que terminó pero nosotros seguíamos replicando
-            setIsReplicating(false)
-            setIsComplete(true)
-            setTimeout(() => setIsComplete(false), 5000)
-            setLastSync(new Date())
         }
-    }, [status, isReplicating, progress])
+    }, [status]) // Remover dependencias cruzadas peligrosas si es posible
 
     const formatDate = (dateStr) => {
         if (!dateStr) return 'Nunca'
