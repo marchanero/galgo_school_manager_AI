@@ -149,7 +149,7 @@ class MediaServerManager {
     })
     this.recordingProcesses.clear()
 
-    if (this.nms) {
+    if (this.nms && typeof this.nms.stop === 'function') {
       this.nms.stop()
       console.log('🛑 Media Server detenido')
     }
