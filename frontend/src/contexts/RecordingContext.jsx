@@ -213,6 +213,12 @@ export function RecordingProvider({ children }) {
   const syncRecordingStatus = useCallback(async (cameraId, cameraName) => {
     try {
       const response = await fetch(`/api/recordings/sync/${cameraId}/status`)
+
+      // 404 means no active session - this is normal, not an error
+      if (response.status === 404) {
+        return false
+      }
+
       const data = await response.json()
 
       console.log(`🔄 Sync status camera ${cameraId}:`, data)
