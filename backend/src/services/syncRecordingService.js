@@ -39,6 +39,65 @@ class SyncRecordingService extends EventEmitter {
   }
 
   /**
+   * Inicializa el servicio y recupera estado previo
+   */
+  async init(prismaClient) {
+    console.log('🔄 Inicializando SyncRecordingService...')
+    
+    try {
+      // 1. Buscar grabaciones que quedaron abiertas (zombies)
+      const zombieRecordings = await prismaClient.recording.findMany({
+        where: {
+          endTime: null
+        },
+        include: {
+          camera: true,
+          scenario: true
+        }
+      })
+      
+      console.log(`🔎 Encontradas ${zombieRecordings.length} grabaciones interrumpidas`)
+      
+      const now = new Date()
+      
+      // 2. Procesar cada grabación interrumpida
+      for (const recording of zombieRecordings) {
+        console.log(`🩹 Recuperando grabación interrumpida para cámara ${recording.camera.name} (ID: ${recording.cameraId})`)
+        
+        // A. Cerrar la grabación anterior en BD
+        await prismaClient.recording.update({
+          where: { id: recording.id },
+          data: {
+            endTime: now,
+            duration: Math.floor((now - recording.startTime) / 1000), // Duración aproximada hasta el reinicio
+            metadata: JSON.stringify({
+              ...JSON.parse(recording.metadata || '{}'),
+              closureReason: 'server_restart' // Marcar razón de cierre
+            })
+          }
+        })
+        
+        // B. Reiniciar la grabación automáticamente
+        if (recording.camera && recording.camera.isActive) {
+          console.log(`▶️ Reiniciando grabación automáticamente para: ${recording.camera.name}`)
+          
+          // Esperar un momento para asegurar que otros servicios (RTSP, etc) estén listos
+          setTimeout(() => {
+            this.startSyncRecording(recording.camera, {
+              scenarioId: recording.scenarioId,
+              scenarioName: recording.scenario ? recording.scenario.name : null,
+              // Mantener topics si estuvieran en metadata (opcional)
+            }).catch(err => console.error(`❌ Error reiniciando grabación ${recording.camera.name}:`, err))
+          }, 5000)
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Error inicializando SyncRecordingService:', error)
+    }
+  }
+
+  /**
    * Inicia grabación sincronizada para una cámara
    * @param {Object} camera - { id, name, rtspUrl }
    * @param {Object} options - { scenarioId, scenarioName, sensorTopics }

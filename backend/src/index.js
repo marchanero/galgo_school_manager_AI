@@ -313,6 +313,14 @@ replicationService.init(prisma, io).then(() => {
   console.error('❌ Error inicializando replicación:', err)
 })
 
+// Inicializar servicio de grabación sincronizada (Recuperación de estado)
+import syncRecordingService from './services/syncRecordingService.js'
+syncRecordingService.init(prisma).then(() => {
+  console.log('✅ Servicio de grabación sincronizada inicializado')
+}).catch(err => {
+  console.error('❌ Error inicializando grabación sincronizada:', err)
+})
+
 // Auto-iniciar grabación para cámaras existentes
 // ⚠️ DESHABILITADO: El auto-inicio siempre graba sin escenario
 // Las grabaciones deben iniciarse manualmente desde el frontend para incluir el escenario activo
