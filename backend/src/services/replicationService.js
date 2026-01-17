@@ -555,6 +555,8 @@ class ReplicationService {
     const adapter = this.selectAdapter()
     const spaceInfo = await this.checkRemoteSpace()
     const serverConfig = this.getServerConfig()
+    const pendingFiles = await this.getPendingFilesCount()
+    const localDiskInfo = await this.getLocalDiskInfo()
 
     return {
       enabled: this.enabled,
@@ -567,7 +569,11 @@ class ReplicationService {
       engine: serverConfig.engine,
       useMock: serverConfig.useMock,
       remoteDiskInfo: spaceInfo,
+      localDiskInfo: localDiskInfo,
+      localSizeFormatted: this.formatBytes(localDiskInfo.used || 0),
       remoteStatus: spaceInfo.available ? 'online' : 'offline',
+      pendingFiles: pendingFiles,
+      localFiles: pendingFiles, // For now assuming all files are pending + synced (simple approximation)
       config: serverConfig,
       stats: this.transferQueue.getStats(),
       space: spaceInfo
