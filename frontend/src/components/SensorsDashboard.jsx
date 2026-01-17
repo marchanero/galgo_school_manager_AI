@@ -383,7 +383,7 @@ function SensorsDashboard() {
                 {scenarioSensors.map((sensor) => (
                   <div
                     key={sensor.id}
-                    className={`relative rounded-lg p-3 ${sensor.isOnline
+                    className={`relative rounded-lg p-3 min-h-[110px] flex flex-col justify-between ${sensor.isOnline
                       ? 'bg-gray-50 dark:bg-gray-700/50 border border-emerald-200 dark:border-emerald-800/50'
                       : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 opacity-60'
                       }`}
@@ -393,23 +393,25 @@ function SensorsDashboard() {
                       <span className={`w-2 h-2 rounded-full block ${sensor.isOnline ? 'bg-emerald-500' : 'bg-gray-400'}`} />
                     </div>
 
-                    {/* Icon */}
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${sensor.isOnline
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30'
-                      : 'bg-gray-200 dark:bg-gray-700'
-                      }`}>
-                      {React.createElement(getSensorIcon(sensor.type), {
-                        className: sensor.isOnline ? 'w-4 h-4 text-indigo-600 dark:text-indigo-400' : 'w-4 h-4 text-gray-400'
-                      })}
+                    <div>
+                      {/* Icon */}
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${sensor.isOnline
+                        ? 'bg-indigo-100 dark:bg-indigo-900/30'
+                        : 'bg-gray-200 dark:bg-gray-700'
+                        }`}>
+                        {React.createElement(getSensorIcon(sensor.type), {
+                          className: sensor.isOnline ? 'w-4 h-4 text-indigo-600 dark:text-indigo-400' : 'w-4 h-4 text-gray-400'
+                        })}
+                      </div>
+
+                      {/* Sensor name */}
+                      <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate mb-2" title={sensor.name}>
+                        {sensor.name}
+                      </h4>
                     </div>
 
-                    {/* Sensor name */}
-                    <h4 className="font-medium text-gray-900 dark:text-white text-xs truncate">
-                      {sensor.name}
-                    </h4>
-
-                    {/* Value display */}
-                    <div className={`text-lg font-bold ${sensor.isOnline
+                    {/* Value display with fixed height container to prevent jitter */}
+                    <div className={`text-lg font-bold min-h-[3rem] flex items-end ${sensor.isOnline
                       ? 'text-gray-900 dark:text-white'
                       : 'text-gray-400'
                       }`}>
