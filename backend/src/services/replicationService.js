@@ -602,8 +602,104 @@ class ReplicationService {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // Métodos de utilidad adicionales se mantienen aquí (cleanup, getStats, etc.)
-  // Para mantener el archivo razonable, las funciones menos usadas se pueden agregar según necesidad
+  /**
+   * Obtiene estadísticas de replicación
+   */
+  async getStats() {
+    return {
+      totalTransferred: this.transferQueue?.totalTransferred || 0,
+      successCount: this.transferQueue?.successCount || 0,
+      failCount: this.transferQueue?.failedCount || 0,
+      lastError: this.transferQueue?.lastError || null,
+      queueLength: this.transferQueue?.queueLength || 0,
+      isProcessing: this.isReplicating
+    }
+  }
+
+  /**
+   * Obtiene información del disco local
+   */
+  async getLocalDiskInfo() {
+    try {
+      const { execSync } = await import('child_process')
+      // Try recordings path first, fall back to mount path
+      const localPath = process.env.RECORDINGS_PATH || replicationConfig.mountPath || '/srv/galgovideo'
+      
+      // df -B1 para obtener bytes exactos
+      const result = execSync(`df -B1 "${localPath}" 2>/dev/null || df -B1 / 2>/dev/null || echo "0 0 0 0%"`, { encoding: 'utf-8' })
+      const lines = result.trim().split('\n')
+      const lastLine = lines[lines.length - 1]
+      const parts = lastLine.split(/\s+/)
+      
+      if (parts.length >= 5) {
+        const total = parseInt(parts[1]) || 0
+        const used = parseInt(parts[2]) || 0
+        const free = parseInt(parts[3]) || 0
+        const usePercent = parseInt(parts[4]) || 0
+        
+        return {
+          available: true,
+          path: localPath,
+          total,
+          used,
+          free,
+          usePercent,
+          totalGB: Math.round(total / (1024 ** 3)),
+          usedGB: Math.round(used / (1024 ** 3)),
+          freeGB: Math.round(free / (1024 ** 3))
+        }
+      }
+      
+      return { available: false, error: 'No se pudo obtener información del disco' }
+    } catch (error) {
+      console.error('Error obteniendo info del disco local:', error.message)
+      return { available: false, error: error.message }
+    }
+  }
+
+  /**
+   * Obtiene información del disco remoto (mount o adapter)
+   */
+  async getRemoteDiskInfo() {
+    try {
+      // Primero verificar si hay mount disponible
+      const spaceInfo = await this.checkMountSpace()
+      if (spaceInfo && spaceInfo.available) {
+        return spaceInfo
+      }
+      
+      // Si no hay mount, intentar con el adapter
+      if (this.currentAdapter && typeof this.currentAdapter.getRemoteSpace === 'function') {
+        return await this.currentAdapter.getRemoteSpace()
+      }
+      
+      return { available: false, message: 'No hay mount ni adapter configurado' }
+    } catch (error) {
+      console.error('Error obteniendo info del disco remoto:', error.message)
+      return { available: false, error: error.message }
+    }
+  }
+
+  /**
+   * Cuenta archivos pendientes de sincronizar
+   */
+  async getPendingFilesCount() {
+    try {
+      const localPath = process.env.RECORDINGS_PATH || '/srv/recordings'
+      const { execSync } = await import('child_process')
+      
+      // Contar archivos de video en el directorio local
+      const result = execSync(
+        `find "${localPath}" -type f \\( -name "*.mp4" -o -name "*.mkv" -o -name "*.avi" \\) 2>/dev/null | wc -l`,
+        { encoding: 'utf-8' }
+      )
+      
+      return parseInt(result.trim()) || 0
+    } catch (error) {
+      console.error('Error contando archivos pendientes:', error.message)
+      return 0
+    }
+  }
 }
 
 // Singleton
