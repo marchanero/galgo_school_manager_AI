@@ -1,0 +1,163 @@
+import React from 'react'
+import { HardDrive, Activity, Gauge, Radio } from 'lucide-react'
+import { formatBytes } from '../../utils/formatters'
+
+/**
+ * SystemStats - System metrics and disk information sidebar
+ * 
+ * Displays:
+ * - Local disk usage with visual bar
+ * - Remote disk usage with visual bar
+ * - Active sensors list
+ * - System metrics
+ */
+const SystemStats = ({
+    localDiskInfo,
+    remoteDiskInfo,
+    activeSensors = [],
+    stats = {}
+}) => {
+    /**
+     * Renders disk info panel
+     */
+    const renderDiskInfo = (diskInfo, title, icon) => {
+        if (!diskInfo || !diskInfo.available) {
+            return (
+                <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-2">
+                        {icon}
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">No disponible</p>
+                </div>
+            )
+        }
+
+        const usePercent = diskInfo.usePercent || 0
+        const bgColor = usePercent >= 90 ? 'bg-red-500' : usePercent >= 75 ? 'bg-yellow-500' : 'bg-green-500'
+
+        return (
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        {icon}
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{title}</span>
+                    </div>
+                    <span className={`text-xs font-medium ${usePercent >= 90 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {usePercent}%
+                    </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-2">
+                    <div
+                        className={`${bgColor} h-2 rounded-full transition-all`}
+                        style={{ width: `${usePercent}%` }}
+                    ></div>
+                </div>
+
+                {/* Disk stats */}
+                <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                    <span>{diskInfo.freeGB || 0} GB libres</span>
+                    <span>{diskInfo.totalGB || 0} GB total</span>
+                </div>
+
+                {diskInfo.isMount && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {diskInfo.mountPath}
+                    </p>
+                )}
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-4">
+            {/* Disk Information */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <HardDrive className="w-4 h-4 text-indigo-500" />
+                    Almacenamiento
+                </h3>
+                <div className="space-y-3">
+                    {renderDiskInfo(
+                        localDiskInfo,
+                        'Disco Local',
+                        <Gauge className="w-4 h-4 text-blue-500" />
+                    )}
+                    {renderDiskInfo(
+                        remoteDiskInfo,
+                        'Disco Remoto',
+                        <Gauge className="w-4 h-4 text-purple-500" />
+                    )}
+                </div>
+            </div>
+
+            {/* Active Sensors */}
+            {activeSensors.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                        <Radio className="w-4 h-4 text-green-500" />
+                        Sensores Activos
+                    </h3>
+                    <div className="space-y-2">
+                        {activeSensors.map((sensor) => (
+                            <div
+                                key={sensor.id}
+                                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                                        {sensor.type}
+                                    </span>
+                                </div>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {sensor.value !== undefined ? sensor.value : '-'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* System Stats */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-orange-500" />
+                    Estadísticas
+                </h3>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Cámaras activas</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                            {stats.activeCameras || 0}/{stats.totalCameras || 0}
+                        </span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Grabaciones</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                            {stats.recordingCameras || 0}
+                        </span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Sensores</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                            {stats.activeSensors || 0}/{stats.totalSensors || 0}
+                        </span>
+                    </div>
+                    {stats.messagesPerSecond !== undefined && (
+                        <div className="flex justify-between">
+                            <span className="text-gray-600 dark:text-gray-400">Msg/s</span>
+                            <span className="font-medium text-gray-900 dark:text-white">
+                                {stats.messagesPerSecond.toFixed(1)}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}
+
+export default SystemStats

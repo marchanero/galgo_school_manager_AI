@@ -554,6 +554,9 @@ class ReplicationService {
   async getStatus() {
     const adapter = this.selectAdapter()
     const spaceInfo = await this.checkRemoteSpace()
+    const serverConfig = this.getServerConfig()
+    const pendingFiles = await this.getPendingFilesCount()
+    const localDiskInfo = await this.getLocalDiskInfo()
 
     return {
       enabled: this.enabled,
@@ -562,7 +565,16 @@ class ReplicationService {
       lastSyncTime: this.lastSyncTime,
       currentProgress: this.currentProgress,
       adapter: adapter.getName(),
-      config: this.getServerConfig(),
+      // Fields at root level for frontend compatibility
+      engine: serverConfig.engine,
+      useMock: serverConfig.useMock,
+      remoteDiskInfo: spaceInfo,
+      localDiskInfo: localDiskInfo,
+      localSizeFormatted: this.formatBytes(localDiskInfo.used || 0),
+      remoteStatus: spaceInfo.available ? 'online' : 'offline',
+      pendingFiles: pendingFiles,
+      localFiles: pendingFiles, // For now assuming all files are pending + synced (simple approximation)
+      config: serverConfig,
       stats: this.transferQueue.getStats(),
       space: spaceInfo
     }
@@ -602,8 +614,115 @@ class ReplicationService {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  // Métodos de utilidad adicionales se mantienen aquí (cleanup, getStats, etc.)
-  // Para mantener el archivo razonable, las funciones menos usadas se pueden agregar según necesidad
+  /**
+   * Obtiene estadísticas de replicación
+   */
+  async getStats() {
+    return {
+      totalTransferred: this.transferQueue?.totalTransferred || 0,
+      successCount: this.transferQueue?.successCount || 0,
+      failCount: this.transferQueue?.failedCount || 0,
+      lastError: this.transferQueue?.lastError || null,
+      queueLength: this.transferQueue?.queueLength || 0,
+      isProcessing: this.isReplicating
+    }
+  }
+
+  /**
+   * Obtiene información del disco local
+   */
+  async getLocalDiskInfo() {
+    try {
+      const { execSync } = await import('child_process')
+      const path = await import('path')
+      
+      // Use logical recordings path used by recordingManager
+      const localPath = process.env.RECORDINGS_PATH || path.default.join(process.cwd(), 'recordings')
+      
+      // Ensure directory exists for df
+      if (!fs.existsSync(localPath)) {
+        fs.mkdirSync(localPath, { recursive: true })
+      }
+      
+      // df -B1 para obtener bytes exactos
+      // Fallback to / if path fails (unlikely if mkdir works)
+      const result = execSync(`df -B1 "${localPath}" 2>/dev/null || df -B1 / 2>/dev/null || echo "0 0 0 0%"`, { encoding: 'utf-8' })
+      const lines = result.trim().split('\n')
+      const lastLine = lines[lines.length - 1]
+      const parts = lastLine.split(/\s+/)
+      
+      if (parts.length >= 5) {
+        const total = parseInt(parts[1]) || 0
+        const used = parseInt(parts[2]) || 0
+        const free = parseInt(parts[3]) || 0
+        const usePercent = parseInt(parts[4]) || 0
+        
+        return {
+          available: true,
+          path: localPath,
+          total,
+          used,
+          free,
+          usePercent,
+          totalGB: Math.round(total / (1024 ** 3)),
+          usedGB: Math.round(used / (1024 ** 3)),
+          freeGB: Math.round(free / (1024 ** 3))
+        }
+      }
+      
+      return { available: false, error: 'No se pudo obtener información del disco' }
+    } catch (error) {
+      console.error('Error obteniendo info del disco local:', error.message)
+      return { available: false, error: error.message }
+    }
+  }
+
+  /**
+   * Obtiene información del disco remoto (mount o adapter)
+   */
+  async getRemoteDiskInfo() {
+    try {
+      // Primero verificar si hay mount disponible
+      const spaceInfo = await this.checkMountSpace()
+      if (spaceInfo && spaceInfo.available) {
+        return spaceInfo
+      }
+      
+      // Si no hay mount, intentar con el adapter
+      if (this.currentAdapter && typeof this.currentAdapter.getRemoteSpace === 'function') {
+        return await this.currentAdapter.getRemoteSpace()
+      }
+      
+      return { available: false, message: 'No hay mount ni adapter configurado' }
+    } catch (error) {
+      console.error('Error obteniendo info del disco remoto:', error.message)
+      return { available: false, error: error.message }
+    }
+  }
+
+  /**
+   * Cuenta archivos pendientes de sincronizar
+   */
+  async getPendingFilesCount() {
+    try {
+      const path = await import('path')
+      const localPath = process.env.RECORDINGS_PATH || path.default.join(process.cwd(), 'recordings')
+      const { execSync } = await import('child_process')
+      
+      if (!fs.existsSync(localPath)) return 0
+      
+      // Contar archivos de video en el directorio local
+      const result = execSync(
+        `find "${localPath}" -type f \\( -name "*.mp4" -o -name "*.mkv" -o -name "*.avi" \\) 2>/dev/null | wc -l`,
+        { encoding: 'utf-8' }
+      )
+      
+      return parseInt(result.trim()) || 0
+    } catch (error) {
+      console.error('Error contando archivos pendientes:', error.message)
+      return 0
+    }
+  }
 }
 
 // Singleton

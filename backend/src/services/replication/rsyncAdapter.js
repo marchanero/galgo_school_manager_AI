@@ -119,10 +119,36 @@ export class MountAdapter {
       
       proc.stdout.on('data', (data) => {
         const line = data.toString().trim()
-        const match = line.match(/(\d+,?\d*)\s+\d+%/)
-        if (match) {
-          bytesTransferred = parseInt(match[1].replace(/,/g, ''), 10)
+        
+        // Parse rsync progress: 43,908,212 100% 41.87MB/s 0:00:01
+        // Regex para capturar bytes, porcentaje, velocidad y tiempo
+        const progressMatch = line.match(/(\d{1,3}(?:,\d{3})*)\s+(\d{1,3})%\s+([0-9.]+[a-zA-Z]+\/s)\s+([0-9:]+)/)
+        
+        if (progressMatch) {
+          const bytes = parseInt(progressMatch[1].replace(/,/g, ''), 10)
+          const percentage = parseInt(progressMatch[2], 10)
+          const speed = progressMatch[3]
+          const eta = progressMatch[4]
+          
+          if (onProgress) {
+            onProgress({
+              percent: percentage,
+              speed: speed,
+              eta: eta,
+              transferred: progressMatch[1] + ' B', // formato rudo, se podría mejorar
+              total: '...', // rsync no da total fácil en una línea
+              bytes: bytes
+            })
+          }
+          bytesTransferred = bytes
+        } else {
+            // Intento alternativo para capturar bytes si el regex complejo falla pero hay %
+            const simpleMatch = line.match(/(\d+,?\d*)\s+\d+%/)
+            if (simpleMatch) {
+                bytesTransferred = parseInt(simpleMatch[1].replace(/,/g, ''), 10)
+            }
         }
+
         if (!line.includes('%') && line.length > 0 && line.length < 100) {
           console.log(`[rsync] ${line}`)
         }

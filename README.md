@@ -524,6 +524,55 @@ El proyecto incluye funcionalidades implementadas y un roadmap de mejoras adicio
 
 Para más detalles sobre la implementación y especificaciones técnicas, consulta el documento completo en [`docs/REPLICATION_IMPROVEMENTS.md`](docs/REPLICATION_IMPROVEMENTS.md).
 
+
+---
+
+## 🏃 Ejecución Persistente con PM2
+
+Para mantener la aplicación corriendo en segundo plano (producción o testing prolongado), utilizamos **PM2**.
+
+### 1. Iniciar servicios
+El proyecto incluye un archivo `ecosystem.config.js` preconfigurado.
+
+```bash
+# Instalar dependencias (si no lo has hecho)
+npm install
+
+# Iniciar Backend y Frontend
+npx pm2 start ecosystem.config.js
+```
+
+Esto iniciará:
+- **galgo-backend**: Puerto 3000
+- **galgo-frontend**: Puerto 5173 (Expuesto a la red local)
+
+### 2. Comandos útiles
+
+```bash
+# Ver estado de procesos
+npx pm2 list
+
+# Ver logs en tiempo real
+npx pm2 logs
+
+# Ver logs solo del backend
+npx pm2 logs galgo-backend
+
+# Reiniciar todos los servicios
+npx pm2 restart all
+
+# Detener todos los servicios
+npx pm2 stop all
+```
+
+### 3. Iniciar al arranque del sistema
+Para que la aplicación se inicie automáticamente si el servidor se reinicia:
+
+```bash
+npx pm2 startup
+npx pm2 save
+```
+
 ---
 
 ## 🤝 Contribuir
