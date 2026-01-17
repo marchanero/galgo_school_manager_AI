@@ -18,6 +18,14 @@ module.exports = {
       env: {
         PORT: 5173
       }
+    },
+    {
+      name: "galgo-sensors",
+      cwd: "./test_publisher",
+      script: "simulate_sensors_10min.mjs",
+      env: {
+        DURATION_SEC: "5400" // 1.5 horas
+      }
     }
   ]
 }

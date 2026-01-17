@@ -545,6 +545,7 @@ npx pm2 start ecosystem.config.js
 Esto iniciará:
 - **galgo-backend**: Puerto 3000
 - **galgo-frontend**: Puerto 5173 (Expuesto a la red local)
+- **galgo-sensors**: Simulación MQTT (90 min)
 
 ### 2. Comandos útiles
 
