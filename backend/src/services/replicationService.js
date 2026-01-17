@@ -554,6 +554,7 @@ class ReplicationService {
   async getStatus() {
     const adapter = this.selectAdapter()
     const spaceInfo = await this.checkRemoteSpace()
+    const serverConfig = this.getServerConfig()
 
     return {
       enabled: this.enabled,
@@ -562,7 +563,12 @@ class ReplicationService {
       lastSyncTime: this.lastSyncTime,
       currentProgress: this.currentProgress,
       adapter: adapter.getName(),
-      config: this.getServerConfig(),
+      // Fields at root level for frontend compatibility
+      engine: serverConfig.engine,
+      useMock: serverConfig.useMock,
+      remoteDiskInfo: spaceInfo,
+      remoteStatus: spaceInfo.available ? 'online' : 'offline',
+      config: serverConfig,
       stats: this.transferQueue.getStats(),
       space: spaceInfo
     }
