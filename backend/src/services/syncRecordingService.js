@@ -24,6 +24,18 @@ class SyncRecordingService extends EventEmitter {
     super()
     this.activeSessions = new Map() // cameraId -> session data
     this.recordingsDir = path.join(process.cwd(), 'recordings')
+    // Escuchar nuevos archivos de video para asociarlos a la sesión activa
+    recordingManager.on('newFile', (data) => {
+      const session = this.activeSessions.get(data.cameraId)
+      if (session) {
+        console.log(`📎 Asociando archivo ${data.filename} a sesión ${session.sessionId}`)
+        session.videoFiles.push({
+          filename: data.filename,
+          created: data.timestamp,
+          path: data.fullPath
+        })
+      }
+    })
   }
 
   /**
@@ -40,6 +52,30 @@ class SyncRecordingService extends EventEmitter {
       return {
         success: false,
         error: 'Ya hay una grabación activa'
+      }
+    }
+
+    // RESOLVER RTSP URL SI ES 'auto'
+    // El frontend envía 'auto' para que el backend maneje la fuente real
+    if (!camera.rtspUrl || camera.rtspUrl === 'auto') {
+      try {
+        console.log(`🔍 Resolviendo URL RTSP para cámara ${camera.id}...`)
+        const dbCamera = await prisma.camera.findUnique({
+          where: { id: parseInt(camera.id) }
+        })
+        
+        if (dbCamera && dbCamera.rtspUrl) {
+          camera.rtspUrl = dbCamera.rtspUrl
+          console.log(`✅ URL RTSP resuelta: ${camera.rtspUrl}`)
+        } else {
+          throw new Error('No se pudo resolver la URL RTSP de la base de datos')
+        }
+      } catch (error) {
+        console.error('❌ Error resolviendo RTSP URL:', error)
+        return {
+          success: false,
+          error: `Error resolviendo URL de cámara: ${error.message}`
+        }
       }
     }
 
@@ -319,9 +355,34 @@ class SyncRecordingService extends EventEmitter {
     )
     const manifestPath = path.join(manifestDir, `session_${session.sessionId.slice(0, 8)}.json`)
 
-    // Listar archivos de video generados
+    // Listar archivos de video
+    // Prioridad 1: Archivos rastreados durante la sesión (más preciso)
+    // Prioridad 2: Escaneo de directorio (fallback)
     let videoFiles = []
-    if (fs.existsSync(manifestDir)) {
+    
+    if (session.videoFiles && session.videoFiles.length > 0) {
+      // Usar archivos rastreados
+      videoFiles = session.videoFiles.map(f => {
+        let size = 0
+        try {
+          if (f.path && fs.existsSync(f.path)) {
+            size = fs.statSync(f.path).size
+          } else {
+             // Intentar construir path si no existe
+             const probablePath = path.join(manifestDir, f.filename)
+             if (fs.existsSync(probablePath)) size = fs.statSync(probablePath).size
+          }
+        } catch (e) { console.error('Error obteniendo tamaño:', e) }
+
+        return {
+          filename: f.filename,
+          size: size,
+          created: f.created
+        }
+      })
+    } else if (fs.existsSync(manifestDir)) {
+      // Fallback: Escanear directorio (riesgo de incluir archivos de otras sesiones)
+      console.log('⚠️ Usando fallback de escaneo de directorio para manifest')
       videoFiles = fs.readdirSync(manifestDir)
         .filter(f => f.endsWith('.mp4'))
         .map(f => {
@@ -332,6 +393,14 @@ class SyncRecordingService extends EventEmitter {
             size: stats.size,
             created: stats.birthtime
           }
+        })
+        // Simple filtro por hora de creación (dentro del rango de sesión +/- margen)
+        .filter(f => {
+          const createdTime = new Date(f.created).getTime()
+          const startTime = session.masterTimestamp.getTime()
+          const endTime = endTimestamp.getTime()
+          // Margen de 10 segundos
+          return createdTime >= (startTime - 10000) && createdTime <= (endTime + 10000)
         })
     }
 

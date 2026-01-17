@@ -230,19 +230,23 @@ class RecordingManager extends EventEmitter {
     // 3. max_muxing_queue_size reducido de 9999 a 512
     // 4. analyzeduration/probesize limitan análisis inicial
     // 5. fflags +genpts+discardcorrupt evita acumulación de frames corruptos
-    // 6. NO usamos movflags=+faststart (requiere reescritura completa en memoria)
-    //    En su lugar, post-procesamos con qt-faststart si es necesario
+    //
+    // NOTA: Las opciones -reconnect* son solo para HTTP/HTTPS, NO para RTSP
+    // Para RTSP usamos -timeout para timeout de conexión
     //
     const ffmpegArgs = [
-      // ===== LÍMITES DE MEMORIA DE ENTRADA =====
+      // ===== OPCIONES GLOBALES =====
+      '-hide_banner',
+      
+      // ===== OPCIONES DE ENTRADA RTSP =====
       '-rtbufsize', this.config.inputBufferSize,  // Buffer circular RTSP (16MB)
       '-analyzeduration', this.config.analyzeDuration,  // Límite análisis stream
       '-probesize', this.config.probeSize,              // Límite probe inicial
-      
-      // ===== INPUT RTSP =====
       '-rtsp_transport', 'tcp',
-      '-stimeout', '5000000',     // Timeout de conexión 5s
+      '-timeout', '5000000',     // Timeout de conexión 5s (microsegundos, FFmpeg 6.x)
       '-fflags', '+genpts+discardcorrupt',  // Generar timestamps, descartar frames corruptos
+      
+      // ===== INPUT =====
       '-i', camera.rtspUrl,
       
       // ===== CODEC (copy = sin transcodificación = menos CPU/RAM) =====
@@ -254,23 +258,19 @@ class RecordingManager extends EventEmitter {
       '-f', 'segment',
       '-segment_time', this.config.segmentTime.toString(),  // 5 minutos
       '-segment_format', 'mp4',
-      // NO usamos movflags=+faststart aquí - causa buffering de todo el segmento
-      // El moov atom queda al final, pero es aceptable para grabaciones
       '-reset_timestamps', '1',
       '-strftime', '1',
       
-      // ===== ROBUSTEZ CON LÍMITES DE MEMORIA =====
+      // ===== OPCIONES DE SALIDA =====
       '-avoid_negative_ts', 'make_zero',
       '-max_muxing_queue_size', this.config.maxMuxingQueue.toString(),  // 512 (antes 9999)
-      '-reconnect', '1',
-      '-reconnect_streamed', '1',
-      '-reconnect_delay_max', '5',
-      
-      // ===== FLUSH FRECUENTE A DISCO =====
       '-flush_packets', '1',  // Escribir paquetes inmediatamente
       
       outputPattern
     ]
+    
+    // DEBUG: Mostrar comando completo
+    console.log(`🔧 FFmpeg command: ffmpeg ${ffmpegArgs.join(' ')}`)
     
     const ffmpegProcess = spawn(this.config.ffmpegPath, ffmpegArgs, {
       stdio: ['pipe', 'pipe', 'pipe']
@@ -306,13 +306,23 @@ class RecordingManager extends EventEmitter {
       }
       
       // Detectar nuevo archivo
+      // Output típico: [segment @ ...] Opening 'path/to/file.mp4' for writing
       if (output.includes('Opening') && output.includes('.mp4')) {
-        console.log(`💾 Nuevo archivo: ${camera.name}${scenarioInfo}`)
-        this.emit('newFile', {
-          cameraId: camera.id,
-          cameraName: camera.name,
-          outputDir: cameraDir
-        })
+        const match = output.match(/Opening '(.+?)'/)
+        const fullPath = match ? match[1] : null
+        const filename = fullPath ? path.basename(fullPath) : null
+        
+        if (filename) {
+          console.log(`💾 Nuevo archivo detectado: ${filename}`)
+          this.emit('newFile', {
+            cameraId: camera.id,
+            cameraName: camera.name,
+            outputDir: cameraDir,
+            filename: filename,
+            fullPath: fullPath,
+            timestamp: new Date()
+          })
+        }
       }
       
       // Detectar errores

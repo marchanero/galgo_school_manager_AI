@@ -25,6 +25,7 @@
     "node-cron": "^4.2.1",
     "node-media-server": "^4.1.0",
     "node-rtsp-stream": "^0.0.9",
+    "socket.io": "^4.8.3",
     "uuid": "^13.0.0",
     "ws": "^8.18.3",
     "zod": "^4.3.5"

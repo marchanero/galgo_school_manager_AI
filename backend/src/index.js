@@ -35,6 +35,15 @@ const prisma = new PrismaClient()
 const PORT = process.env.PORT || 3000
 
 // Inicializar WebSocket Server para ambos servicios
+import { Server } from 'socket.io'
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+})
+
+// Inicializar WebSocket Server nativo para streaming legacy/webrtc
 const wss = new WebSocketServer({ noServer: true })
 
 // Inicializar servicio de streaming WebSocket (sin crear su propio servidor)
@@ -297,8 +306,8 @@ const initMQTT = async () => {
 setTimeout(initMQTT, 1000)
 
 // Inicializar servicio de replicación
-// TODO: Añadir Socket.IO para progreso en tiempo real
-replicationService.init(prisma).then(() => {
+// Con Socket.IO para progreso en tiempo real
+replicationService.init(prisma, io).then(() => {
   console.log('✅ Servicio de replicación inicializado')
 }).catch(err => {
   console.error('❌ Error inicializando replicación:', err)
