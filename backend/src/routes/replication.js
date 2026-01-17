@@ -177,4 +177,22 @@ router.post('/test-connection', async (req, res) => {
   }
 })
 
+// GET /api/replication/progress - Obtener progreso actual de la replicación
+router.get('/progress', (req, res) => {
+  const progress = replicationService.currentProgress
+  const isReplicating = replicationService.isReplicating
+  
+  res.json({
+    isReplicating,
+    progress: progress ? {
+      transferred: progress.transferred,
+      total: progress.total,
+      percent: progress.percent,
+      speed: progress.speed,
+      eta: progress.eta,
+      timestamp: progress.timestamp
+    } : null
+  })
+})
+
 export default router

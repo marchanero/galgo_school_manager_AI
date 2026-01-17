@@ -13,6 +13,8 @@ class ReplicationService {
     this.isReplicating = false
     this.queue = []
     this.prisma = null
+    this.io = null  // Socket.io instance para emitir progreso
+    this.currentProgress = null  // Estado actual del progreso de replicación
     this.cronTask = null
     this.schedule = '0 3 * * *' // Default: 3:00 AM
     this.enabled = false
@@ -251,7 +253,7 @@ class ReplicationService {
   }
 
   /**
-   * Ejecuta transferencia con rclone
+   * Ejecuta transferencia con rclone con progreso en tiempo real
    */
   rcloneCopy(localPath, remotePath, options = {}) {
     return new Promise((resolve, reject) => {
@@ -268,9 +270,9 @@ class ReplicationService {
         `--retries-sleep=${options.retrySleep || retrySleep}s`,
         `--timeout=${options.timeout || timeout}s`,
         '--low-level-retries=20',
-        '--stats=30s',
+        '--stats=1s',
         '--stats-one-line',
-        '-v'
+        '-P'  // Progreso en tiempo real
       ]
       
       console.log(`🚀 Ejecutando: rclone ${args.slice(0, 4).join(' ')} ...`)
@@ -278,22 +280,55 @@ class ReplicationService {
       const proc = spawn('rclone', args)
       let stderr = ''
       
+      // Regex para parsear línea de progreso de rclone
+      // Ejemplo: "Transferred:   50 MiB / 328 MiB, 15%, 5.2 MiB/s, ETA 53s"
+      const progressRegex = /Transferred:\s*([0-9.]+\s*\w+)\s*\/\s*([0-9.]+\s*\w+),\s*(\d+)%,\s*([0-9.]+\s*\w+\/s),\s*ETA\s*(.+)/
+      
       proc.stdout.on('data', (data) => {
-        const line = data.toString().trim()
-        if (line.includes('Transferred:') || line.includes('Errors:')) {
-          console.log(`[rclone] ${line}`)
+        const lines = data.toString().split('\n')
+        for (const line of lines) {
+          const match = line.match(progressRegex)
+          if (match) {
+            const progressData = {
+              transferred: match[1],
+              total: match[2],
+              percent: parseInt(match[3], 10),
+              speed: match[4],
+              eta: match[5].trim(),
+              timestamp: new Date().toISOString()
+            }
+            
+            // Actualizar estado interno
+            this.currentProgress = progressData
+            
+            // Emitir via WebSocket si está disponible
+            if (this.io) {
+              this.io.emit('replication:progress', progressData)
+            }
+            
+            // Log cada 10%
+            if (progressData.percent % 10 === 0) {
+              console.log(`📊 Progreso: ${progressData.percent}% | ${progressData.speed} | ETA: ${progressData.eta}`)
+            }
+          }
         }
       })
       
       proc.stderr.on('data', (data) => {
         stderr += data.toString()
         const line = data.toString().trim()
-        if (!line.includes('DEBUG') && line.length > 0) {
+        if (!line.includes('DEBUG') && line.length > 0 && !line.includes('Transferred:')) {
           console.log(`[rclone] ${line}`)
         }
       })
       
       proc.on('close', (code) => {
+        // Limpiar progreso al finalizar
+        this.currentProgress = null
+        if (this.io) {
+          this.io.emit('replication:complete', { success: code === 0 })
+        }
+        
         if (code === 0) {
           resolve({ success: true })
         } else {
@@ -491,8 +526,9 @@ class ReplicationService {
   // INICIALIZACIÓN Y CONFIGURACIÓN
   // ═══════════════════════════════════════════════════════════════════════════
 
-  async init(prisma) {
+  async init(prisma, io = null) {
     this.prisma = prisma
+    this.io = io  // Socket.io para emitir progreso
     await this.loadConfig()
     this.setupCron()
     

@@ -297,6 +297,7 @@ const initMQTT = async () => {
 setTimeout(initMQTT, 1000)
 
 // Inicializar servicio de replicación
+// TODO: Añadir Socket.IO para progreso en tiempo real
 replicationService.init(prisma).then(() => {
   console.log('✅ Servicio de replicación inicializado')
 }).catch(err => {

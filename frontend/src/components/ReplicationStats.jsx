@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
+import SyncProgressBar from './SyncProgressBar'
 
 export default function ReplicationStats() {
   const [stats, setStats] = useState({
@@ -57,11 +58,14 @@ export default function ReplicationStats() {
   if (loading) return <div className="animate-pulse h-24 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 space-y-4">
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white">
         Estado de Replicación
       </h3>
-      
+
+      {/* Barra de progreso en tiempo real */}
+      <SyncProgressBar />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
           <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Videos Locales</div>
@@ -98,31 +102,28 @@ export default function ReplicationStats() {
         </div>
 
         {/* Información del Disco Local */}
-        <div className={`p-4 rounded-lg transition-all duration-300 ${
-          stats.localDiskInfo?.usePercent > 90 
-            ? 'bg-red-50 dark:bg-red-900/20' 
-            : stats.localDiskInfo?.usePercent > 75 
-            ? 'bg-yellow-50 dark:bg-yellow-900/20'
-            : 'bg-orange-50 dark:bg-orange-900/20'
-        }`}>
-          <div className={`text-sm font-medium ${
-            stats.localDiskInfo?.usePercent > 90 
-              ? 'text-red-600 dark:text-red-400' 
-              : stats.localDiskInfo?.usePercent > 75 
-              ? 'text-yellow-600 dark:text-yellow-400'
-              : 'text-orange-600 dark:text-orange-400'
-          }`}>Disco Local</div>
+        <div className={`p-4 rounded-lg transition-all duration-300 ${stats.localDiskInfo?.usePercent > 90
+            ? 'bg-red-50 dark:bg-red-900/20'
+            : stats.localDiskInfo?.usePercent > 75
+              ? 'bg-yellow-50 dark:bg-yellow-900/20'
+              : 'bg-orange-50 dark:bg-orange-900/20'
+          }`}>
+          <div className={`text-sm font-medium ${stats.localDiskInfo?.usePercent > 90
+              ? 'text-red-600 dark:text-red-400'
+              : stats.localDiskInfo?.usePercent > 75
+                ? 'text-yellow-600 dark:text-yellow-400'
+                : 'text-orange-600 dark:text-orange-400'
+            }`}>Disco Local</div>
           {stats.localDiskInfo?.available ? (
             <div className="mt-1">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {stats.localDiskInfo.availableGB}GB / {stats.localDiskInfo.totalGB}GB
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    stats.localDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                    stats.localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${stats.localDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                      stats.localDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                    }`}
                   style={{ width: `${stats.localDiskInfo.usePercent}%` }}
                 ></div>
               </div>
@@ -138,31 +139,28 @@ export default function ReplicationStats() {
         </div>
 
         {/* Información del Disco Remoto */}
-        <div className={`p-4 rounded-lg transition-all duration-300 ${
-          stats.remoteDiskInfo?.usePercent > 90 
-            ? 'bg-red-50 dark:bg-red-900/20' 
-            : stats.remoteDiskInfo?.usePercent > 75 
-            ? 'bg-amber-50 dark:bg-amber-900/20'
-            : 'bg-indigo-50 dark:bg-indigo-900/20'
-        }`}>
-          <div className={`text-sm font-medium ${
-            stats.remoteDiskInfo?.usePercent > 90 
-              ? 'text-red-600 dark:text-red-400' 
-              : stats.remoteDiskInfo?.usePercent > 75 
-              ? 'text-amber-600 dark:text-amber-400'
-              : 'text-indigo-600 dark:text-indigo-400'
-          }`}>Disco Remoto</div>
+        <div className={`p-4 rounded-lg transition-all duration-300 ${stats.remoteDiskInfo?.usePercent > 90
+            ? 'bg-red-50 dark:bg-red-900/20'
+            : stats.remoteDiskInfo?.usePercent > 75
+              ? 'bg-amber-50 dark:bg-amber-900/20'
+              : 'bg-indigo-50 dark:bg-indigo-900/20'
+          }`}>
+          <div className={`text-sm font-medium ${stats.remoteDiskInfo?.usePercent > 90
+              ? 'text-red-600 dark:text-red-400'
+              : stats.remoteDiskInfo?.usePercent > 75
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-indigo-600 dark:text-indigo-400'
+            }`}>Disco Remoto</div>
           {stats.remoteDiskInfo?.available ? (
             <div className="mt-1">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {stats.remoteDiskInfo.availableGB}GB / {stats.remoteDiskInfo.totalGB}GB
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    stats.remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
-                    stats.remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
-                  }`}
+                <div
+                  className={`h-2 rounded-full transition-all duration-300 ${stats.remoteDiskInfo.usePercent > 90 ? 'bg-red-500' :
+                      stats.remoteDiskInfo.usePercent > 75 ? 'bg-yellow-500' : 'bg-green-500'
+                    }`}
                   style={{ width: `${stats.remoteDiskInfo.usePercent}%` }}
                 ></div>
               </div>
