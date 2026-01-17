@@ -24,7 +24,7 @@ module.exports = {
       cwd: "./test_publisher",
       script: "simulate_sensors_10min.mjs",
       env: {
-        DURATION_SEC: "5400" // 1.5 horas
+        DURATION_SEC: "0" // 0 = Infinito
       }
     }
   ]

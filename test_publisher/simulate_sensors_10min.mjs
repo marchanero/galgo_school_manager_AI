@@ -109,7 +109,8 @@ client.on('connect', () => {
     const now = Date.now();
     const elapsed = now - startTime;
 
-    if (elapsed >= DURATION_MS) {
+    // Check duration only if DURATION_MS > 0
+    if (DURATION_MS > 0 && elapsed >= DURATION_MS) {
       clearInterval(fastTimer);
       clearInterval(slowTimer);
       console.log('\n✅ Simulación completada.');
